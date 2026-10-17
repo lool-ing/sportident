@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+coverage/
+*.tgz
+
+# Logs
+*.log
+
+# Local environment
+.env
+.env.*
+
+# Editor
+.vscode/settings.json
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Scratch space
+tmp/
+
+# Local reference material that is not ours to publish (SPORTident docs)
+.reference/

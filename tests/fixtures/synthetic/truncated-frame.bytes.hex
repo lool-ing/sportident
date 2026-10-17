@@ -1,0 +1,4 @@
+# Truncated SET_MS(0x4D): only the first 4 bytes [STX, CMD, LEN, P_MS_DIRECT]
+# — missing crc_hi / crc_lo / ETX. parse should return {message: null, remainder: <all 4 bytes>}
+# so the multiplexer can buffer-and-retry on the next chunk.
+02 F0 01 4D

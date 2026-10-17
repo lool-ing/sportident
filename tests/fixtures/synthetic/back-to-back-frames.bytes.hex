@@ -1,0 +1,3 @@
+# Two valid SET_MS(0x4D) frames concatenated with no separator.
+# parseAll should return { messages: [m1, m2], remainder: [] }.
+02 F0 01 4D 6D 0A 03 02 F0 01 4D 6D 0A 03

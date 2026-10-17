@@ -1,0 +1,7 @@
+node_modules/
+dist/
+coverage/
+pnpm-lock.yaml
+
+# NDJSON (one object per line), not a JSON file.
+tests/fixtures/bench/*.expected.json

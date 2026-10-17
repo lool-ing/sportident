@@ -1,0 +1,17 @@
+# Lint and format staged files; commitlint on the commit message.
+# Glob limited to source/text formats we actually lint or format.
+
+pre-commit:
+  parallel: true
+  commands:
+    prettier:
+      glob: '*.{ts,js,cjs,mjs,json,md,yml,yaml}'
+      run: pnpm exec prettier --check {staged_files}
+    eslint:
+      glob: '*.{ts,js,cjs,mjs}'
+      run: pnpm exec eslint {staged_files}
+
+commit-msg:
+  commands:
+    commitlint:
+      run: pnpm exec commitlint --edit {1}

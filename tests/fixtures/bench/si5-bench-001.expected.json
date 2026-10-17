@@ -1,0 +1,6 @@
+{"schema_version":1,"event":"connection_changed","ts_ms":1778649269134,"device_path":"/dev/ttyUSB0","state":"opening"}
+{"schema_version":1,"event":"connection_changed","ts_ms":1778649269152,"device_path":"/dev/ttyUSB0","state":"opening"}
+{"schema_version":1,"event":"connection_changed","ts_ms":1778649269344,"device_path":"/dev/ttyUSB0","state":"open"}
+{"schema_version":1,"event":"card_inserted","ts_ms":1778649272220,"device_path":"/dev/ttyUSB0","card_type":"SI5","card_number":320541}
+{"schema_version":1,"event":"card_read","ts_ms":1778649273238,"device_path":"/dev/ttyUSB0","card_type":"SI5","card_number":320541,"start":{"seconds_in_half_day":20917,"half_day":0,"weekday":null},"finish":{"seconds_in_half_day":20802,"half_day":0,"weekday":null},"check":{"seconds_in_half_day":20907,"half_day":0,"weekday":null},"clear":null,"punch_count":2,"punches":[{"code":136,"seconds_in_half_day":20980,"half_day":0,"weekday":null},{"code":110,"seconds_in_half_day":20900,"half_day":0,"weekday":null}],"card_holder":{"country_code":46,"club_code":1}}
+{"schema_version":1,"event":"connection_changed","ts_ms":1778649273240,"device_path":"/dev/ttyUSB0","state":"closed"}

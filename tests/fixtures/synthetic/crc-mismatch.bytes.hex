@@ -1,0 +1,7 @@
+# CRC mismatch: SET_MS(0x4D) with one CRC bit flipped (last bit of crc_lo).
+# Body = [0xF0 (SET_MS), 0x01 (LEN), 0x4D (P_MS_DIRECT)].
+# Real CRC = 6D 0A (verified via siProtocol.CRC16); fixture flips to 6D 0B.
+# Test expectation: parseAll(bytes, {onFrameError}) -> 0 messages,
+#   onFrameError fires once with error_code: 'crc_mismatch',
+#   expected_crc: [0x6D, 0x0A], actual_crc: [0x6D, 0x0B], bytes_consumed: 7.
+02 F0 01 4D 6D 0B 03

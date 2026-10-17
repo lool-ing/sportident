@@ -1,0 +1,3 @@
+# 0-byte success markers from --record runs; useful as local "did it exit?"
+# breadcrumbs but never worth committing.
+*.stderr.log

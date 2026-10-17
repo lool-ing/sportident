@@ -1,0 +1,7 @@
+# Partial + completing chunks of one SET_MS(0x4D) frame.
+# The blank line is purely for human readability — the test loads the whole
+# file as a single byte stream and expects parseAll to assemble one message.
+# Real CRC for SET_MS(0x4D) body = 6D 0A.
+02 F0 01 4D
+
+6D 0A 03
