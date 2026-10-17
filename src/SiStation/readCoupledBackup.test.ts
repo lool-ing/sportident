@@ -13,10 +13,8 @@
 //   3) SET_MS(0xF0) with P_MS_DIRECT (0x4D) — restore master mode (finally).
 //
 // §2.5 mandates a retry loop on NAK because the first forwarded instruction
-// starts the inductive sync and frequently fails. We model a dropped-NAK as a
-// per-attempt timeout (the multiplexer silently drops bare NAK frames, so a
-// forwarded command that the coupled station NAKs simply doesn't resolve and
-// the short per-attempt timeout fires) — the retry helper treats both
+// starts the inductive sync and frequently fails. A NAK rejects the command,
+// silence hits the short per-attempt timeout; the retry helper treats both
 // timeout and rejection uniformly as "retry".
 
 import { describe, test } from 'node:test';

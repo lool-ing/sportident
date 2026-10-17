@@ -94,4 +94,20 @@ describe('SiTargetMultiplexer: send-queue lifecycle', () => {
 
     await mux.close();
   });
+
+  test('a bare NAK fails the pending command at once', async () => {
+    const transport = new SilentTransport();
+    const mux = new SiTargetMultiplexer(transport);
+    const pending = mux.sendMessage({ command: proto.cmd.GET_SI8, parameters: [0x04] }, 1, 1_000);
+    await new Promise((r) => setImmediate(r));
+    transport.inject([proto.NAK]);
+    await assert.rejects(pending, /NAK/);
+
+    // The next command pairs with its own reply.
+    const next = mux.sendMessage({ command: proto.cmd.GET_SI8, parameters: [0x00] }, 1, 200);
+    await new Promise((r) => setImmediate(r));
+    transport.inject(renderFrame(proto.cmd.GET_SI8, [0x00, 0x0a, 0x00]));
+    assert.strictEqual((await next)[0]?.[4], 0x00);
+    await mux.close();
+  });
 });

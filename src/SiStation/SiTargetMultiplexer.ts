@@ -187,12 +187,18 @@ export class SiTargetMultiplexer extends EventEmitter {
   /** Route a parsed message: either to the head pending task (if it matches
    * the expected response command) or as a free-floating 'message' event. */
   private _dispatch(message: SiMessage): void {
-    // Bare modes (ACK/NAK/WAKEUP from upstream) are silently dropped — no
-    // event, no console output. Consumers can subscribe
-    // to a dedicated event later if needed.
-    if (message.mode !== undefined) return;
-
     const head = this.pendingSendTasks[0];
+    // A bare NAK refuses the command in flight (eg the card was pulled mid-read):
+    // fail it now instead of waiting for the timeout. Other bare modes
+    // (ACK/WAKEUP) are dropped.
+    if (message.mode !== undefined) {
+      if (message.mode === proto.NAK && head) {
+        head.failWithError(new Error('NAK'));
+        this._removeTask(head);
+      }
+      return;
+    }
+
     if (head && head.message.mode === undefined) {
       const sentCommand = head.message.command;
       // Modern SI cards: GET_SI5 / GET_SI8 responses echo their request command.

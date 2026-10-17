@@ -242,8 +242,8 @@ export interface CoupledReadOptions {
    * (§2.5: "delay time should vary in steps of some 10 ms"). Default 15. */
   retryDelayMs?: number;
   /** Per-attempt response timeout in ms passed to sendMessage. Kept short so a
-   * dropped NAK (which the multiplexer silently swallows) fails fast and the
-   * retry loop can re-issue. Default 1500. */
+   * command the coupled station never answers fails fast and the retry loop
+   * can re-issue. Default 1500. */
   attemptTimeoutMs?: number;
   /** Injectable sleep (tests pass a no-op). Default: real setTimeout. */
   sleep?: (ms: number) => Promise<void>;
@@ -257,9 +257,9 @@ const defaultSleep = (ms: number): Promise<void> =>
  *
  * The first instruction forwarded to a freshly-coupled station starts the
  * inductive synchronisation and frequently NAKs or simply doesn't answer.
- * The multiplexer drops bare NAK frames silently, so a NAK surfaces here as a
- * SendTimeoutError. Both rejection and timeout are treated identically: wait a
- * short, growing delay and retry, up to maxRetries attempts.
+ * A NAK rejects the command, silence surfaces as a SendTimeoutError. Both
+ * are treated identically: wait a short, growing delay and retry, up to
+ * maxRetries attempts.
  */
 async function sendWithRetry(
   station: ISiStation,

@@ -716,6 +716,94 @@ describe('SiMainStation handshake + dispatch', () => {
   });
 });
 
+/**
+ * Card A (SI10) is pulled while its page 4 is requested; 30 ms later card B
+ * (SI9) is put on the station. The station answers page 4 with a bare NAK
+ * (`nak`) or not at all, then reports SI_REM for A and SI8_DET for B in one
+ * chunk. Bench repro 2026-10-17: B's page 0 was handed to A's page-4 request.
+ */
+const setUpPulledCard = (fake: FakeSerialTransport, nak: boolean): void => {
+  const bytesPerPage = 128;
+  const a = si10Fixture.cardData.cardNumber;
+  let onStation: 'A' | 'B' | undefined = 'A';
+  fake.addRule(
+    (chunk) => chunk[0] === proto.WAKEUP && chunk[2] === proto.cmd.GET_SI8,
+    (chunk) => {
+      const page = chunk[4] as number;
+      if (onStation === 'A' && page === 4) {
+        onStation = undefined;
+        setTimeout(() => {
+          onStation = 'B';
+          fake.inject([
+            ...renderFrame(proto.cmd.SI_REM, [
+              0x00,
+              0x00,
+              0x0f,
+              (a >> 16) & 0xff,
+              (a >> 8) & 0xff,
+              a & 0xff,
+            ]),
+            ...buildSi8DetFrame(si9Fixture.cardData.cardNumber, 0x01),
+          ]);
+        }, 30);
+        return nak ? [proto.NAK] : undefined;
+      }
+      const storage =
+        onStation === 'A'
+          ? si10Fixture.storageData
+          : onStation === 'B'
+            ? si9Fixture.storageData
+            : undefined;
+      if (storage === undefined) return [proto.NAK];
+      const start = page * bytesPerPage;
+      return renderGetSi8PageResponse(
+        page,
+        (storage as number[]).slice(start, start + bytesPerPage)
+      );
+    }
+  );
+};
+
+/** Run the pulled-card scenario; returns what the station reported. */
+const runPulledCard = async (
+  nak: boolean
+): Promise<{ read: SiCard9[]; errors: Error[]; sendsAfterInsert: number[][] }> => {
+  const fake = new FakeSerialTransport();
+  setUpHandshakeRules(fake);
+  const station = new SiMainStation(fake);
+  await fake.open();
+  await station.readCards();
+  setUpPulledCard(fake, nak);
+  const read: SiCard9[] = [];
+  const errors: Error[] = [];
+  station.on('cardRead', (card: SiCard9) => read.push(card));
+  station.on('error', (err: Error) => errors.push(err));
+  const before = fake.recordedSends.length;
+  fake.inject(buildSi8DetFrame(si10Fixture.cardData.cardNumber, 0x0f));
+  // Far below the 10 s send timeout: the pulled read must fail on its own.
+  await new Promise((r) => setTimeout(r, 200));
+  const sendsAfterInsert = fake.recordedSends.slice(before);
+  await station.close();
+  return { read, errors, sendsAfterInsert };
+};
+
+const assertOnlyBReadAndAcked = (result: Awaited<ReturnType<typeof runPulledCard>>): void => {
+  assert.strictEqual(result.errors.length, 1, 'the pulled card A fails once');
+  assert.strictEqual(result.read.length, 1, 'card B is read');
+  assert.ok(result.read[0] instanceof SiCard9);
+  assert.strictEqual(result.read[0]!.raceResult.cardNumber, si9Fixture.cardData.cardNumber);
+  const acks = result.sendsAfterInsert.filter((c) => c.length === 1 && c[0] === proto.ACK);
+  assert.strictEqual(acks.length, 1, 'exactly one ACK, for B');
+  const lastPageRead = result.sendsAfterInsert.findLastIndex((c) => c[2] === proto.cmd.GET_SI8);
+  assert.ok(result.sendsAfterInsert.indexOf(acks[0]!) > lastPageRead, 'ACK after B is read');
+};
+
+describe('SiMainStation: card pulled mid-read', () => {
+  test('NAK during a page read fails that read; the next card is read correctly', async () => {
+    assertOnlyBReadAndAcked(await runPulledCard(true));
+  });
+});
+
 // Suppress "registers populated by side-effect" lint hint on the imports.
 void BaseSiCard;
 // Reference CRC16 so unused-import lint doesn't trip when the helper inlines change.
