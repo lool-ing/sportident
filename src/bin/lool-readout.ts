@@ -26,6 +26,8 @@
 
 import { SerialTransport } from '../transport/SerialTransport.ts';
 import { SiMainStation } from '../SiStation/SiMainStation.ts';
+import type { ISerialTransport } from '../transport/ISerialTransport.ts';
+import { DeviceClosedError } from '../transport/errors.ts';
 import { NdjsonEmitter } from '../output/ndjson.ts';
 import { emitDiagnostic } from '../output/diagnostics.ts';
 import { formatEvent } from '../output/pretty.ts';
@@ -81,8 +83,9 @@ Exit codes:
   0   Clean shutdown (SIGINT, --once after a successful card read, or
       --replay match).
   1   Fatal initialisation failure (bad --device, unknown arg, replay diff).
-  3   Card-read failure: the station emitted an 'error' event mid-read. A structured connection_changed/error NDJSON event is
-      emitted before exit.
+  3   The device closed during a card read. A structured
+      connection_changed/error NDJSON event is emitted before exit. Other
+      card-read errors emit that event and readout goes on.
 `;
 
 export const parseArgs = (argv: string[]): CliOpts => {
@@ -163,6 +166,79 @@ const runReplay = async (basename: string): Promise<void> => {
   process.exit(1);
 };
 
+/**
+ * Wire the station's and transport's events to the NDJSON emitter. Exported
+ * for tests; `shutdown` is the only way out of the process.
+ */
+export const wireReadout = (
+  station: SiMainStation,
+  transport: ISerialTransport,
+  emitter: NdjsonEmitter,
+  opts: Pick<CliOpts, 'once'>,
+  shutdown: (code: number) => Promise<void>
+): void => {
+  // Wire all five events. The frameError handler receives
+  // the typed FrameError directly — NO string parsing of warning lines.
+  //
+  // card_inserted card_type uses the shared
+  // inferCardType(cardNumber) helper so the bin (record path) and
+  // replayFixture (replay path) agree. The constructor.name → CardType map
+  // (TYPE_MAP) stays in place for card_read in NdjsonEmitter where the card
+  // instance carries richer state that drives extra fields — it's only the
+  // card_inserted event where range-based inference and constructor.name
+  // ever disagreed pre-fix.
+  station.on('cardInserted', (card: BaseSiCard) => {
+    emitter.card_inserted({
+      card_type: inferCardType(card.cardNumber),
+      card_number: card.cardNumber,
+      ...(card.cardSeriesByte !== undefined ? { card_series_byte: card.cardSeriesByte } : {}),
+    });
+  });
+  station.on('cardRead', (card: BaseSiCard) => {
+    emitter.card_read({ card });
+    if (opts.once) {
+      void shutdown(0);
+    }
+  });
+  station.on('cardRemoved', (cardNumber: number) =>
+    emitter.card_removed({ card_number: cardNumber })
+  );
+  station.on('frameError', (err: FrameError) => {
+    emitter.frame_error(err);
+    emitDiagnostic(
+      `frame_error ${err.error_code}: expected ${formatCrcHex(err.expected_crc)}, got ${formatCrcHex(err.actual_crc)} (${err.bytes_consumed} bytes consumed)`
+    );
+  });
+  station.on(
+    'connectionChanged',
+    (state: 'opening' | 'open' | 'closed' | 'error', err?: { message?: string }) => {
+      emitter.connection_changed({
+        state,
+        ...(err?.message ? { error: err.message } : {}),
+      });
+    }
+  );
+
+  // SiMainStation emits Node's special 'error' event when a card read fails
+  // (eg the card was pulled mid-read); SerialTransport re-emits serialport
+  // errors the same way. Without a listener the EventEmitter rule turns either
+  // into a process crash. Report it (NDJSON `connection_changed/error` + a
+  // stderr diagnostic) and keep reading: one bad card must not end readout.
+  // Only a transport close mid-read exits (code 3).
+  const report = (label: string) => (err: Error) => {
+    const message = err instanceof Error ? err.message : String(err);
+    try {
+      emitter.connection_changed({ state: 'error', error: message });
+    } catch {
+      // ignore secondary failure
+    }
+    emitDiagnostic(`${label}: ${message}`);
+    if (err instanceof DeviceClosedError) void shutdown(3);
+  };
+  station.on('error', report('card-read error'));
+  transport.on('error', report('serial error'));
+};
+
 const main = async (): Promise<void> => {
   const opts = parseArgs(process.argv.slice(2));
 
@@ -219,48 +295,6 @@ const main = async (): Promise<void> => {
 
   const station = new SiMainStation(activeTransport);
 
-  // Wire all five events. The frameError handler receives
-  // the typed FrameError directly — NO string parsing of warning lines.
-  //
-  // card_inserted card_type uses the shared
-  // inferCardType(cardNumber) helper so the bin (record path) and
-  // replayFixture (replay path) agree. The constructor.name → CardType map
-  // (TYPE_MAP) stays in place for card_read in NdjsonEmitter where the card
-  // instance carries richer state that drives extra fields — it's only the
-  // card_inserted event where range-based inference and constructor.name
-  // ever disagreed pre-fix.
-  station.on('cardInserted', (card: BaseSiCard) => {
-    emitter.card_inserted({
-      card_type: inferCardType(card.cardNumber),
-      card_number: card.cardNumber,
-      ...(card.cardSeriesByte !== undefined ? { card_series_byte: card.cardSeriesByte } : {}),
-    });
-  });
-  station.on('cardRead', (card: BaseSiCard) => {
-    emitter.card_read({ card });
-    if (opts.once) {
-      void shutdown(0);
-    }
-  });
-  station.on('cardRemoved', (cardNumber: number) =>
-    emitter.card_removed({ card_number: cardNumber })
-  );
-  station.on('frameError', (err: FrameError) => {
-    emitter.frame_error(err);
-    emitDiagnostic(
-      `frame_error ${err.error_code}: expected ${formatCrcHex(err.expected_crc)}, got ${formatCrcHex(err.actual_crc)} (${err.bytes_consumed} bytes consumed)`
-    );
-  });
-  station.on(
-    'connectionChanged',
-    (state: 'opening' | 'open' | 'closed' | 'error', err?: { message?: string }) => {
-      emitter.connection_changed({
-        state,
-        ...(err?.message ? { error: err.message } : {}),
-      });
-    }
-  );
-
   // Centralised shutdown: closes station then sinks (flushing RecordSink) then exits.
   const shutdown = async (code: number): Promise<void> => {
     try {
@@ -278,27 +312,11 @@ const main = async (): Promise<void> => {
     process.exit(code);
   };
 
+  wireReadout(station, transport, emitter, opts, shutdown);
+
   // SIGINT: close cleanly, exit 0.
   process.on('SIGINT', () => {
     void shutdown(0);
-  });
-
-  //
-  // SiMainStation emits Node's special 'error' event when a card read fails
-  // (e.g. partial-page response, transport closes mid-read). Without an
-  // installed listener the EventEmitter rule promotes the error to a process
-  // crash. Wire it to the same structured-shutdown path SIGINT uses so the
-  // operator sees an NDJSON `connection_changed/error` event AND a stderr
-  // diagnostic, then exits non-zero (code 3 = card-read failure).
-  station.on('error', (err: Error) => {
-    const message = err instanceof Error ? err.message : String(err);
-    try {
-      emitter.connection_changed({ state: 'error', error: message });
-    } catch {
-      // ignore secondary failure
-    }
-    emitDiagnostic(`card-read error: ${message}`);
-    void shutdown(3);
   });
 
   // Ensure piped stdout writes don't drop on

@@ -255,10 +255,13 @@ const main = async (): Promise<void> => {
     emitDiagnostic(`frame_error: ${err.error_code} (${err.bytes_consumed} bytes consumed)`);
   });
 
-  station.on('error', (err: Error) => {
+  // Report and keep going; serialport errors come through the transport.
+  const report = (err: Error): void => {
     emitter.connection_changed({ state: 'error', error: err.message });
     emitDiagnostic(`station error: ${err.message}`);
-  });
+  };
+  station.on('error', report);
+  transport.on('error', report);
 
   await transport.open();
   emitter.connection_changed({ state: 'open' });
