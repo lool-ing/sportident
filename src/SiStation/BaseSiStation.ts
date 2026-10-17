@@ -32,8 +32,8 @@ export const STATION_CONFIG_OFFSETS = {
   /** Serial number bytes [0..3] (big-endian). DO NOT WRITE here — readout only. */
   SERIAL_NUMBER: { offset: 0x00, length: 4 },
   /**
-   * Station code low byte (whole byte). High 2 bits live in byte 0x73 bits 6:7
-   * — Phase 0 keeps code ≤ 255 so those high bits stay zero.
+   * Station code low byte (whole byte). High 2 bits live in byte 0x73 bits 6:7.
+   * readCards() leaves the code alone.
    */
   CODE_LOW: 0x72,
   /** Station mode (whole byte: 0x05 = Readout). */

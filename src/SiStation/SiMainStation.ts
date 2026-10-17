@@ -85,9 +85,9 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
    * Step 2: readInfo() — fetch 128-byte config blob via GET_SYS_VAL(0, 128).
    * Step 3: bit-aware merge into the in-memory config:
    *   - byte 0x71 (whole byte) = StationMode.Readout
-   *   - byte 0x72 (whole byte) = code low byte (10)
-   *   - byte 0x73: set BEEPS (bit 2) + FLASHES (bit 0); clear code-high-bits
-   *     (code ≤ 255). All other bits preserved.
+   *   - byte 0x73: set BEEPS (bit 2) + FLASHES (bit 0). All other bits preserved.
+   *   - The station code (0x72 + 0x73 bits 6:7) is left alone: readout doesn't
+   *     need it, and it is persistent config the operator set.
    *   - byte 0x74: set EXT_PROTO (bit 0) + HANDSHAKE (bit 2); clear AUTO_SEND
    *     (bit 1). Other bits (sprint4ms, passwordOnly, stopOnFullBackup,
    *     autoReadout) are preserved so we don't silently change unrelated
@@ -126,15 +126,9 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
       // MODE = Readout (0x05) → byte 0x71 (whole byte).
       newConfig[STATION_CONFIG_OFFSETS.MODE] = StationMode.Readout;
 
-      // CODE = 10 → byte 0x72 (low byte). High bits 6:7 of byte 0x73 stay zero
-      // since code ≤ 255; the bit-merge for 0x73 below clears them explicitly.
-      newConfig[STATION_CONFIG_OFFSETS.CODE_LOW] = 10;
-
-      // Byte 0x73: set BEEPS (bit 2) + FLASHES (bit 0); clear code-high-bits.
+      // Byte 0x73: set BEEPS (bit 2) + FLASHES (bit 0); the code-high-bits stay.
       newConfig[STATION_CONFIG_OFFSETS.FLAG_BYTE_73] =
-        (newConfig[STATION_CONFIG_OFFSETS.FLAG_BYTE_73]! & ~FLAG_BITS_73.CODE_HIGH_MASK) |
-        FLAG_BITS_73.BEEPS |
-        FLAG_BITS_73.FLASHES;
+        newConfig[STATION_CONFIG_OFFSETS.FLAG_BYTE_73]! | FLAG_BITS_73.BEEPS | FLAG_BITS_73.FLASHES;
 
       // Byte 0x74: set EXT_PROTO (bit 0) + HANDSHAKE (bit 2); clear AUTO_SEND
       // (bit 1). All other bits preserved.

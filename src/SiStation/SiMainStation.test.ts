@@ -168,7 +168,10 @@ const renderGetSi5Response = (page128: number[]): number[] => {
 };
 
 /** Set up the rules for the atomic handshake. Returns the transport once configured. */
-const setUpHandshakeRules = (fake: FakeSerialTransport): void => {
+const setUpHandshakeRules = (
+  fake: FakeSerialTransport,
+  config: number[] = makeStationConfigBlob()
+): void => {
   // SET_MS — match a chunk starting [WAKEUP, STX, SET_MS, ...]. Real-wire
   // response shape: [addr_hi, addr_lo, P_MS_DIRECT] (bench: 02 F0 03 00 0A 4D ...).
   fake.addRule(
@@ -180,7 +183,7 @@ const setUpHandshakeRules = (fake: FakeSerialTransport): void => {
   fake.addRule(
     (chunk) =>
       chunk[0] === proto.WAKEUP && chunk[1] === proto.STX && chunk[2] === proto.cmd.GET_SYS_VAL,
-    () => renderGetSysValResponse(0x00, makeStationConfigBlob())
+    () => renderGetSysValResponse(0x00, config)
   );
   // SET_SYS_VAL — real-wire response: [addr_hi, addr_lo, offset_echo]. The
   // station echoes the offset byte that was written.
@@ -194,6 +197,20 @@ const setUpHandshakeRules = (fake: FakeSerialTransport): void => {
       return renderFrame(proto.cmd.SET_SYS_VAL, [0x00, 0x0a, offset]);
     }
   );
+};
+
+/** Replay every SET_SYS_VAL write in `sends` onto a copy of `config`. Each
+ * on-wire frame: [WAKEUP, STX, cmd, len, offset, ...bytes, crc_hi, crc_lo, ETX]. */
+const applyConfigWrites = (config: number[], sends: number[][]): number[] => {
+  const result = config.slice();
+  for (const chunk of sends) {
+    if (chunk[0] !== proto.WAKEUP || chunk[1] !== proto.STX) continue;
+    if (chunk[2] !== proto.cmd.SET_SYS_VAL) continue;
+    const offset = chunk[4] as number;
+    const numDataBytes = (chunk[3] as number) - 1; // len counts the offset byte
+    for (let i = 0; i < numDataBytes; i++) result[offset + i] = chunk[5 + i] as number;
+  }
+  return result;
 };
 
 /** Helper: build an SI5_DET frame for the given card number (legacy format). */
@@ -277,34 +294,13 @@ describe('SiMainStation handshake + dispatch', () => {
     assert.ok(sentCommands.includes(proto.cmd.SET_SYS_VAL), 'SET_SYS_VAL sent');
     assert.deepStrictEqual(states, ['opening', 'open']);
 
-    // Reconstruct the post-handshake config by replaying every SET_SYS_VAL
-    // write onto a copy of the synthetic pre-handshake blob. Each on-wire
-    // frame: [WAKEUP, STX, cmd, len, offset, ...bytes, crc_hi, crc_lo, ETX].
-    const postConfig = makeStationConfigBlob();
-    for (const chunk of fake.recordedSends) {
-      if (chunk[0] !== proto.WAKEUP) continue;
-      if (chunk[1] !== proto.STX) continue;
-      if (chunk[2] !== proto.cmd.SET_SYS_VAL) continue;
-      const len = chunk[3] as number; // params length (offset + bytes)
-      const offset = chunk[4] as number;
-      const numDataBytes = len - 1;
-      for (let i = 0; i < numDataBytes; i++) {
-        postConfig[offset + i] = chunk[5 + i] as number;
-      }
-    }
+    const postConfig = applyConfigWrites(makeStationConfigBlob(), fake.recordedSends);
 
     // Mode is whole-byte Readout.
     assert.strictEqual(
       postConfig[STATION_CONFIG_OFFSETS.MODE],
       StationMode.Readout,
       `byte 0x71 (mode) expected ${StationMode.Readout}, got ${postConfig[STATION_CONFIG_OFFSETS.MODE]}`
-    );
-
-    // Code low byte is 10 (whole byte at 0x72).
-    assert.strictEqual(
-      postConfig[STATION_CONFIG_OFFSETS.CODE_LOW],
-      10,
-      `byte 0x72 (code low) expected 10, got ${postConfig[STATION_CONFIG_OFFSETS.CODE_LOW]}`
     );
 
     // Byte 0x73 has FLASHES (bit 0) and BEEPS (bit 2) SET.
@@ -317,13 +313,6 @@ describe('SiMainStation handshake + dispatch', () => {
       (byte73 & FLAG_BITS_73.FLASHES) !== 0,
       `byte 0x73 FLASHES bit (0x01) must be SET, got 0x${byte73.toString(16)}`
     );
-    // code-high-bits cleared (code <= 255).
-    assert.strictEqual(
-      byte73 & FLAG_BITS_73.CODE_HIGH_MASK,
-      0,
-      `byte 0x73 CODE_HIGH bits must be CLEAR, got 0x${byte73.toString(16)}`
-    );
-
     // Byte 0x74 has EXT_PROTO (bit 0) + HANDSHAKE (bit 2) SET; AUTO_SEND
     // (bit 1) CLEAR; sprint4ms (bit 3) PRESERVED from pre-handshake state.
     const byte74 = postConfig[STATION_CONFIG_OFFSETS.FLAG_BYTE_74]!;
@@ -357,6 +346,29 @@ describe('SiMainStation handshake + dispatch', () => {
 
     await station.close();
   });
+
+  for (const [label, codeLow, byte73] of [
+    ['code 31', 31, 0x00],
+    ['code 287 (high bits set)', 31, 0b01 << 6],
+  ] as const) {
+    test(`1b) readCards keeps the station's ${label}`, async () => {
+      const preConfig = makeStationConfigBlob();
+      preConfig[STATION_CONFIG_OFFSETS.CODE_LOW] = codeLow;
+      preConfig[STATION_CONFIG_OFFSETS.FLAG_BYTE_73] = byte73;
+      const fake = new FakeSerialTransport();
+      setUpHandshakeRules(fake, preConfig);
+      const station = new SiMainStation(fake);
+      await fake.open();
+      await station.readCards();
+      const postConfig = applyConfigWrites(preConfig, fake.recordedSends);
+      assert.strictEqual(postConfig[STATION_CONFIG_OFFSETS.CODE_LOW], codeLow);
+      assert.strictEqual(
+        postConfig[STATION_CONFIG_OFFSETS.FLAG_BYTE_73]! & FLAG_BITS_73.CODE_HIGH_MASK,
+        byte73
+      );
+      await station.close();
+    });
+  }
 
   test('2) every wire chunk starts with WAKEUP (0xFF)', async () => {
     const fake = new FakeSerialTransport();
