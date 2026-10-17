@@ -50,6 +50,8 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
   private multiplexer: SiTargetMultiplexer;
   private station: BaseSiStation;
   private isClosed = false;
+  /** The card whose read is in flight, if any. */
+  private readingCard: BaseSiCard | undefined;
 
   constructor(transport: ISerialTransport) {
     super();
@@ -170,6 +172,7 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
     if (message.mode !== undefined) return;
     // SI_REM: card removed.
     if (message.command === proto.cmd.SI_REM) {
+      this._abortRead();
       // params layout matches SI5_DET / SI8_DET — bytes 3..5 carry the card number.
       const card = BaseSiCard.detectFromMessage({
         // Repackage SI_REM as if it were the matching detection command so we
@@ -198,6 +201,7 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
       message.command === proto.cmd.SI6_DET ||
       message.command === proto.cmd.SI8_DET
     ) {
+      this._abortRead();
       const card = BaseSiCard.detectFromMessage(message);
       if (!card) return;
       card.mainStation = {
@@ -205,6 +209,7 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
           this.multiplexer.sendMessage(msg, expected, timeout),
       };
       this.emit('cardInserted', card);
+      this.readingCard = card;
       // Drive the typeSpecificRead chain; emit cardRead on success.
       //
       //
@@ -217,6 +222,9 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
       // (cardInserted -> [card data on wire] -> [ACK on wire] -> cardRead).
       card
         .read()
+        .finally(() => {
+          if (this.readingCard === card) this.readingCard = undefined;
+        })
         .then(() => this.multiplexer.sendBareAck())
         .then(() => this.emit('cardRead', card))
         .catch((err: Error) => {
@@ -235,6 +243,14 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
       return;
     }
     // Other free-floating commands (autosend etc.) — Phase 4 territory.
+  }
+
+  /** The card being read left the station (SI_REM, or a new card's DET): fail
+   * its read now, so no reply meant for the next card is taken as its data. */
+  private _abortRead(): void {
+    if (this.readingCard) {
+      this.multiplexer._abortAllPendingSends('', new Error('card removed during read'));
+    }
   }
 
   private _emitState(state: ConnectionState): void {

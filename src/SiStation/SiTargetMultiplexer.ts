@@ -233,11 +233,15 @@ export class SiTargetMultiplexer extends EventEmitter {
     this.emit('close');
   }
 
-  private _abortAllPendingSends(reason: string): void {
-    // #9 — fail every in-flight task on disconnect so
-    // bin/lool-readout doesn't hang in zombie state.
+  /** Fail every in-flight task: with DeviceClosedError on disconnect (#9, so
+   * bin/lool-readout doesn't hang in zombie state), or with `error` when the
+   * card being read leaves the station. */
+  _abortAllPendingSends(reason: string, error?: Error): void {
     const tasks = this.pendingSendTasks;
     this.pendingSendTasks = [];
-    for (const t of tasks) t.abort(reason);
+    for (const t of tasks) {
+      if (error) t.failWithError(error);
+      else t.abort(reason);
+    }
   }
 }

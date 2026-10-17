@@ -802,6 +802,12 @@ describe('SiMainStation: card pulled mid-read', () => {
   test('NAK during a page read fails that read; the next card is read correctly', async () => {
     assertOnlyBReadAndAcked(await runPulledCard(true));
   });
+
+  test('pulled card (SI_REM, no NAK) + new card inside the old timeout: no misattribution', async () => {
+    const result = await runPulledCard(false);
+    assertOnlyBReadAndAcked(result);
+    assert.match(result.errors[0]!.message, /removed/);
+  });
 });
 
 // Suppress "registers populated by side-effect" lint hint on the imports.
