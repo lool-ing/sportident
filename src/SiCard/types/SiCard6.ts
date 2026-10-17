@@ -166,7 +166,12 @@ export class SiCard6 extends BaseSiCard {
     const clearTime = this.storage.get('clearTime')?.value;
     if (clearTime !== undefined) this.raceResult.clearTime = clearTime;
     const punches = this.storage.get('punches')?.value;
-    if (punches !== undefined) this.raceResult.punches = punches as IPunch[];
+    // Slots past the punch count may still hold old punches.
+    if (punches !== undefined)
+      this.raceResult.punches = (punches as IPunch[]).slice(
+        0,
+        this.storage.get('punchCount')?.value
+      );
     const punchCount = this.storage.get('punchCount')?.value;
     if (punchCount !== undefined) this.punchCount = punchCount;
   }

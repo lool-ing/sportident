@@ -446,7 +446,12 @@ export class ModernSiCard extends BaseSiCard {
     const checkCode = this.storage.get('checkCode')?.value;
     if (checkTime != null && checkCode !== undefined) this.raceResult.checkCode = checkCode;
     const punches = this.storage.get('punches')?.value;
-    if (punches !== undefined) this.raceResult.punches = punches as IPunch[];
+    // Slots past the punch count may still hold old punches.
+    if (punches !== undefined)
+      this.raceResult.punches = (punches as IPunch[]).slice(
+        0,
+        this.storage.get('punchCount')?.value
+      );
     const cardHolder = this.storage.get('cardHolder')?.value;
     if (cardHolder !== undefined) {
       this.raceResult.cardHolder = cardHolder as { [k: string]: unknown };
