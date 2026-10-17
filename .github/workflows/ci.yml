@@ -1,0 +1,29 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      # Corepack activates the pnpm version in package.json `packageManager`.
+      - name: Enable Corepack (pins pnpm from package.json `packageManager`)
+        run: corepack enable && corepack prepare --activate
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: shellcheck --severity=warning scripts/*.sh
+      - run: pnpm lint
+      - run: pnpm typecheck
+      # Before test: esmImport.test.ts imports the built dist/.
+      - run: pnpm build
+      - run: pnpm test

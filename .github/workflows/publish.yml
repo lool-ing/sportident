@@ -1,0 +1,30 @@
+# Publishes to npm on a version tag (v0.1.0, ...). No NPM_TOKEN: npm
+# Trusted Publishing authenticates this workflow through OIDC, and
+# --provenance links the package to this build.
+
+name: publish
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Enable Corepack (pins pnpm from package.json `packageManager`)
+        run: corepack enable && corepack prepare --activate
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm test
+      - run: npm publish --provenance --access public
