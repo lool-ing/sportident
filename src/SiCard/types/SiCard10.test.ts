@@ -123,4 +123,16 @@ describe('SiCard10 decoder — upstream fixture', () => {
     assert.strictEqual(card.punchCount, 64);
     assert.strictEqual(card.raceResult.punches?.length, 64);
   });
+
+  test('5) a GET_SI8 reply for another page is an error, not data', async () => {
+    // A stale or misrouted reply (eg the next card's page 0) must never be
+    // spliced in as the requested page.
+    const card = new SiCard10(0);
+    card.mainStation = {
+      sendMessage: async () => [
+        [proto.cmd.GET_SI8, 128 + 3, 0x00, 0x0a, 0x00, ...new Array<number>(128).fill(0x22)],
+      ],
+    };
+    await assert.rejects(() => card.typeSpecificGetPage(4), /page 0 \(expected 4\)/);
+  });
 });

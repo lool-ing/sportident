@@ -270,6 +270,9 @@ export class ModernSiCard extends BaseSiCard {
         if (frame === undefined) {
           throw new Error(`No response for GET_SI8 page ${pageNumber}`);
         }
+        if (frame[4] !== pageNumber) {
+          throw new Error(`GET_SI8 returned page ${frame[4]} (expected ${pageNumber})`);
+        }
         // Skip 5-byte response header: [cmd, len, addr_hi, addr_lo, page_no].
         // Page payload is 128 bytes. (Real-wire bench transcript 2026-05-13:
         // GET_SI8 response carries [addr_hi, addr_lo, page_no, ...128 data] in
