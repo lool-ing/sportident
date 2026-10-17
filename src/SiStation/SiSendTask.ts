@@ -13,7 +13,7 @@
 import type { SiMessage } from '../siProtocol.ts';
 import { DeviceClosedError, SendTimeoutError } from '../transport/errors.ts';
 
-const DEFAULT_TIMEOUT_MS = 10_000;
+const DEFAULT_TIMEOUT_MS = 2_000;
 
 /**
  * State machine for a single command-response pair. The multiplexer creates one

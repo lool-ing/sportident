@@ -792,7 +792,7 @@ const runPulledCard = async (
   station.on('error', (err: Error) => errors.push(err));
   const before = fake.recordedSends.length;
   fake.inject(buildSi8DetFrame(si10Fixture.cardData.cardNumber, 0x0f));
-  // Far below the 10 s send timeout: the pulled read must fail on its own.
+  // Far below the send timeout: the pulled read must fail on its own.
   await new Promise((r) => setTimeout(r, 200));
   const sendsAfterInsert = fake.recordedSends.slice(before);
   await station.close();

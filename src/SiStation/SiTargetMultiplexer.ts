@@ -29,7 +29,7 @@ import { DeviceClosedError } from '../transport/errors.ts';
 import { SiSendTask } from './SiSendTask.ts';
 
 const RECEIVE_BUFFER_CAP_BYTES = 64 * 1024;
-const DEFAULT_TIMEOUT_MS = 10_000;
+const DEFAULT_TIMEOUT_MS = 2_000;
 
 /**
  * Public events:
@@ -65,7 +65,7 @@ export class SiTargetMultiplexer extends EventEmitter {
 
   /**
    * Send `message` and resolve with up to `expectedResponses` matching response
-   * frames. Times out per `timeoutMs` (default 10s; tests override to 100ms).
+   * frames. Times out per `timeoutMs` (default 2 s; tests override to 100ms).
    * Reject types:
    *   - SendTimeoutError if the station never replies in time.
    *   - DeviceClosedError if the transport closes mid-flight.
