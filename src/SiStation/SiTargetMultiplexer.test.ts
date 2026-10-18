@@ -180,4 +180,23 @@ describe('SiTargetMultiplexer: send-queue lifecycle', () => {
     assert.strictEqual((await pending)[0]?.[5], 0x33);
     await mux.close();
   });
+
+  test('a command expecting two replies resolves with both frames in order; the next command pairs normally', async () => {
+    const transport = new SilentTransport();
+    const mux = new SiTargetMultiplexer(transport);
+    const page = (n: number): number[] => renderFrame(proto.cmd.GET_SI8, [0x00, 0x0a, n, 0x55]);
+    const multi = mux.sendMessage({ command: proto.cmd.GET_SI8, parameters: [0x00] }, 2, 300);
+    transport.inject(page(0x00));
+    await new Promise((r) => setTimeout(r, 5));
+    transport.inject(page(0x01));
+    const frames = await multi; // a timeout here means the 2nd reply was not collected
+    assert.strictEqual(frames.length, 2, 'both replies collected');
+    assert.strictEqual(frames[0]?.[4], 0x00, 'page 0 first');
+    assert.strictEqual(frames[1]?.[4], 0x01, 'page 1 second');
+
+    const next = mux.sendMessage({ command: proto.cmd.GET_SI8, parameters: [0x02] }, 1, 300);
+    transport.inject(page(0x02));
+    assert.strictEqual((await next)[0]?.[4], 0x02, 'the next command pairs with its own reply');
+    await mux.close();
+  });
 });
