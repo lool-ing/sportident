@@ -76,8 +76,9 @@ export class SiTargetMultiplexer extends EventEmitter {
   }
 
   /**
-   * Send `message` and resolve with up to `expectedResponses` matching response
-   * frames. Times out per `timeoutMs` (default 2 s; tests override to 100ms).
+   * Send `message` and resolve once `expectedResponses` matching response
+   * frames have come, in order; fewer in time is a timeout. Times out per
+   * `timeoutMs` (default 2 s; tests override to 100ms).
    * Reject types:
    *   - SendTimeoutError if the station never replies in time.
    *   - DeviceClosedError if the transport closes mid-flight.
@@ -261,15 +262,8 @@ export class SiTargetMultiplexer extends EventEmitter {
       // SI5_DET / SI8_DET / SI_REM are async station-initiated; route to 'message'.
       if (message.command === sentCommand) {
         const frame = [message.command, message.parameters.length, ...message.parameters];
-        head.receive(frame);
-        // Re-check settled state via the public promise; remove if done.
-        // (SiSendTask.receive resolves when expectedResponses is hit; we know
-        // synchronously that the task is settled if we received the final frame.)
-        // We can detect this by attempting to peek at collectedResponses, but
-        // SiSendTask doesn't expose that — instead, we always remove after one
-        // matching frame for Phase 0's expectedResponses=1 default. If we ever
-        // need multi-frame, this dispatch will need state.
-        this._removeTask(head);
+        // Stays the head until it has all its expected frames.
+        if (head.receive(frame)) this._removeTask(head);
         return;
       }
     }

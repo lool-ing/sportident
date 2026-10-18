@@ -57,15 +57,16 @@ export class SiSendTask {
   }
 
   /** Feed a response frame's payload (`number[]`). Resolves when we've
-   * collected `expectedResponses` frames. */
-  receive(frame: number[]): void {
-    if (this.settled) return;
+   * collected `expectedResponses` frames; returns whether the task is done. */
+  receive(frame: number[]): boolean {
+    if (this.settled) return true;
     this.collectedResponses.push(frame);
     if (this.collectedResponses.length >= this.expectedResponses) {
       this.settled = true;
       if (this.timeoutHandle) clearTimeout(this.timeoutHandle);
       this.resolve(this.collectedResponses);
     }
+    return this.settled;
   }
 
   /** Externally-triggered abort — used by SiTargetMultiplexer on transport close. */
