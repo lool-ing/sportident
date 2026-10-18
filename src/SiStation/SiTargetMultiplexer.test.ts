@@ -42,6 +42,17 @@ class SilentTransport extends EventEmitter implements ISerialTransport {
 const renderFrame = (command: number, parameters: number[]): number[] =>
   render({ command, parameters });
 
+/** The first write hangs until `release()`, so later commands wait in the send
+ * queue (a slow drain on the real port). */
+class HeldTransport extends SilentTransport {
+  release: () => void = () => undefined;
+  override send(bytes: number[]): Promise<void> {
+    this.sends.push(bytes);
+    if (this.sends.length > 1) return Promise.resolve();
+    return new Promise((resolve) => (this.release = resolve));
+  }
+}
+
 describe('SiTargetMultiplexer: send-queue lifecycle', () => {
   test('a timed-out task is removed so the next command can pair with its response', async () => {
     const transport = new SilentTransport();
@@ -110,4 +121,30 @@ describe('SiTargetMultiplexer: send-queue lifecycle', () => {
     assert.strictEqual((await next)[0]?.[4], 0x00);
     await mux.close();
   });
+
+  for (const [how, abort] of [
+    [
+      'aborted',
+      (mux: SiTargetMultiplexer) => mux._abortAllPendingSends('', new Error('card removed')),
+    ],
+    ['timed out', () => new Promise((r) => setTimeout(r, 50))],
+  ] as const) {
+    test(`a command ${how} while waiting in the send queue is never written`, async () => {
+      const transport = new HeldTransport();
+      const mux = new SiTargetMultiplexer(transport);
+      const page0 = mux.sendMessage({ command: proto.cmd.GET_SI8, parameters: [0x00] }, 1, 1_000);
+      const page4 = mux.sendMessage({ command: proto.cmd.GET_SI8, parameters: [0x04] }, 1, 20);
+      page0.catch(() => undefined);
+      await new Promise((r) => setImmediate(r)); // page 0 is now stuck in the write
+      await assert.rejects(Promise.all([page4, abort(mux)]));
+      transport.release();
+      await new Promise((r) => setImmediate(r));
+      assert.deepEqual(
+        transport.sends.map((c) => c[4]),
+        [0x00],
+        'only page 0 reached the wire'
+      );
+      await mux.close();
+    });
+  }
 });

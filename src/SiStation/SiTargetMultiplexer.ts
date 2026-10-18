@@ -107,6 +107,9 @@ export class SiTargetMultiplexer extends EventEmitter {
           // task.promise to reject which triggers the finally() cleanup.
           return undefined;
         }
+        // Aborted or timed out while waiting here (eg the card left): its reply
+        // would only land on the next command.
+        if (!this.pendingSendTasks.includes(task)) return undefined;
         return this.transport.send(this._renderForWire(message)).catch((err: Error) => {
           task.failWithError(err);
           // Same: finally() cleanup handles removal.
