@@ -34,7 +34,7 @@ import {
   StationMode,
 } from './BaseSiStation.ts';
 import { SiTargetMultiplexer } from './SiTargetMultiplexer.ts';
-import { NakError } from '../transport/errors.ts';
+import { NakError, SendTimeoutError } from '../transport/errors.ts';
 import type { ConnectionState, ISiMainStation } from './ISiMainStation.ts';
 
 // Side-effect imports: trigger registry population on BaseSiCard so
@@ -47,10 +47,11 @@ import '../SiCard/types/SiCard10.ts';
 import '../SiCard/types/SiCard11.ts';
 import '../SiCard/types/SIAC.ts';
 
-/** A NAKed card command is retried twice, 500 ms after the NAK, as SPORTident's
- * library does (SPORTident.Communication 2.59.0, simulated readout of fixture
- * siac-bench-001, 2026-10-18). */
-const NAK_RETRIES = 2;
+/** A card command gets three tries, as SPORTident's library gives them
+ * (SPORTident.Communication 2.59.0, simulated readout of fixture
+ * siac-bench-001, 2026-10-18): each waits for its reply 2.5 s, 2.5 s, 2 s, and
+ * a NAK is tried again 500 ms after it. */
+const CARD_TRY_TIMEOUTS_MS = [2_500, 2_500, 2_000];
 const NAK_RETRY_MS = 500;
 
 export class SiMainStation extends EventEmitter implements ISiMainStation {
@@ -275,29 +276,42 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
   }
 
   /** A command of `card`'s read. A card that left the station sends nothing
-   * more; a NAK while it is still there is retried. */
+   * more; a NAK or no reply while it is still there is tried again. */
   private async _sendForCard(
     card: BaseSiCard,
     message: SiMessage,
     expectedResponses?: number,
     timeoutMs?: number,
-    retries = NAK_RETRIES
+    attempt = 0
   ): Promise<number[][]> {
     if (this.readingCard !== card) throw new Error('card removed during read');
     try {
-      return await this.multiplexer.sendMessage(message, expectedResponses, timeoutMs);
+      return await this.multiplexer.sendMessage(
+        message,
+        expectedResponses,
+        timeoutMs ?? CARD_TRY_TIMEOUTS_MS[attempt]
+      );
     } catch (err) {
-      if (!(err instanceof NakError) || retries === 0 || this.readingCard !== card) throw err;
-      await new Promise<void>((resolve) => {
-        const timer = setTimeout(resolve, NAK_RETRY_MS);
-        this.cancelNakWait = () => {
-          clearTimeout(timer);
-          resolve();
-        };
-      });
-      this.cancelNakWait = undefined;
-      return this._sendForCard(card, message, expectedResponses, timeoutMs, retries - 1);
+      const again = err instanceof NakError || err instanceof SendTimeoutError;
+      if (!again || attempt + 1 >= CARD_TRY_TIMEOUTS_MS.length || this.readingCard !== card) {
+        throw err;
+      }
+      // The timeout already waited; a NAK came at once, so wait before trying.
+      if (err instanceof NakError) await this._nakWait();
+      return this._sendForCard(card, message, expectedResponses, timeoutMs, attempt + 1);
     }
+  }
+
+  /** NAK_RETRY_MS, ended early by SI_REM or another card. */
+  private async _nakWait(): Promise<void> {
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, NAK_RETRY_MS);
+      this.cancelNakWait = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+    });
+    this.cancelNakWait = undefined;
   }
 
   /** The card being read left the station (SI_REM, or a new card's DET): fail

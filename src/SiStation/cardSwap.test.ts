@@ -58,6 +58,8 @@ class FakeStation extends EventEmitter implements ISerialTransport {
   close(): Promise<void> {
     return Promise.resolve();
   }
+  /** Requests left per 'card:page' that get no reply at all. */
+  silent: Record<string, number> = {};
   /** ACK writes left that fail (a serial write error). */
   failAcks = 0;
   /** The n-th ACK's write (1-based) drains until `release()`. */
@@ -103,6 +105,10 @@ class FakeStation extends EventEmitter implements ISerialTransport {
       this.naks[`${card}:${p}`]!--;
       return this.inject([proto.NAK]);
     }
+    if ((this.silent[`${card}:${p}`] ?? 0) > 0) {
+      this.silent[`${card}:${p}`]!--;
+      return; // no reply at all
+    }
     let out = page((card === 'A' ? A.storageData : B.storageData) as number[], p);
     const hook = this.hooks[`${card}:${p}`];
     if (hook) {
@@ -118,19 +124,31 @@ class FakeStation extends EventEmitter implements ISerialTransport {
 const run = async (
   hooks: Record<string, Hook>,
   naks: Record<string, number> = {},
-  waitMs = 200
-): Promise<{ read: number[]; errors: string[]; log: string[]; at: number[] }> => {
+  waitMs = 200,
+  silent: Record<string, number> = {}
+): Promise<{
+  read: number[];
+  cards: BaseSiCard[];
+  errors: string[];
+  log: string[];
+  at: number[];
+}> => {
   const fake = new FakeStation(hooks, naks);
+  fake.silent = silent;
   const station = new SiMainStation(fake);
   const read: number[] = [];
+  const cards: BaseSiCard[] = [];
   const errors: string[] = [];
-  station.on('cardRead', (c: BaseSiCard) => read.push(c.cardNumber));
+  station.on('cardRead', (c: BaseSiCard) => {
+    read.push(c.cardNumber);
+    cards.push(c);
+  });
   station.on('error', (e: Error) => errors.push(e.message));
   fake.inject(det(A.cardData.cardNumber, 0x0f));
   // Far below the send timeout: nothing here may wait for it.
   await new Promise((r) => setTimeout(r, waitMs));
   await station.close();
-  return { read, errors, log: fake.log, at: fake.at };
+  return { read, cards, errors, log: fake.log, at: fake.at };
 };
 
 const a = A.cardData.cardNumber;
@@ -389,27 +407,51 @@ describe('SiMainStation: an ACK queued behind a draining write', () => {
   });
 });
 
-describe('SiMainStation: line noise in front of a reply', () => {
-  test('02 EF FF before the page-4 reply: the read times out, the next card is read', async () => {
+describe('SiMainStation: timeout retry', () => {
+  /** ms between the n-th and (n+1)-th request for `line`. */
+  const gaps = (r: { log: string[]; at: number[] }, line: string): number[] => {
+    const at = r.log.flatMap((l, k) => (l === line ? [r.at[k]!] : []));
+    return at.slice(1).map((t, i) => Math.round(t - at[i]!));
+  };
+  const firstCode = (c: BaseSiCard): number | undefined =>
+    (c.raceResult.punches as { code: number }[] | undefined)?.[0]?.code;
+
+  test('no reply to page 4 once: asked again after 2.5 s, the card is read and ACKed', async () => {
+    const r = await run({}, {}, 2800, { 'A:4': 1 });
+    assert.deepEqual(r.read, [a]);
+    assert.deepEqual(r.errors, []);
+    assert.deepEqual(r.log, ['GET p0 A', 'GET p4 A', 'GET p4 A', 'ACK']);
+    assert.ok(gaps(r, 'GET p4 A')[0]! >= 2490, `retry after ${gaps(r, 'GET p4 A')}`);
+  });
+
+  test('no reply ever: three tries 2.5 s, 2.5 s and 2 s, then the read fails without an ACK', async () => {
+    const r = await run({}, {}, 7300, { 'A:4': 3 });
+    assert.deepEqual(r.read, []);
+    assert.deepEqual(r.errors, ['Send timed out after 2000ms (command 0xEF)']);
+    assert.deepEqual(r.log, ['GET p0 A', 'GET p4 A', 'GET p4 A', 'GET p4 A']);
+    const [g1, g2] = gaps(r, 'GET p4 A');
+    assert.ok(g1! >= 2490 && g2! >= 2490, `tries ${g1} and ${g2} ms apart`);
+  });
+
+  test("noise in front of the page-4 reply: the retry's reply is used, never the old bytes", async () => {
+    const stale = (A.storageData as number[]).slice();
+    stale[4 * 128 + 1] = 200; // first punch code in the old copy
     const r = await run(
       {
         'A:4': (fake) => {
           setTimeout(() => {
             fake.onStation = 'B';
             fake.inject([...rem(a), ...det(b, 0x01)]);
-          }, 2200);
-          return {
-            extra: [0x02, 0xef, 0xff, ...page(A.storageData as number[], 4)],
-            next: 'A',
-            drop: true,
-          };
+          }, 3000);
+          return { extra: [0x02, 0xef, 0xff, ...page(stale, 4)], next: 'A', drop: true };
         },
       },
       {},
-      2700
+      3500
     );
-    assert.deepEqual(r.read, [b]);
-    assert.deepEqual(r.errors, ['Send timed out after 2000ms (command 0xEF)']);
-    assert.deepEqual(r.log, ['GET p0 A', 'GET p4 A', ...B_PAGES, 'ACK']);
+    assert.deepEqual(r.read, [a, b]);
+    assert.deepEqual(r.errors, []);
+    assert.equal(firstCode(r.cards[0]!), (A.cardData.punches as { code: number }[])[0]!.code);
+    assert.deepEqual(r.log, ['GET p0 A', 'GET p4 A', 'GET p4 A', 'ACK', ...B_PAGES, 'ACK']);
   });
 });
