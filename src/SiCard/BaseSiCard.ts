@@ -21,7 +21,9 @@
 
 import { proto } from '../constants.ts';
 import { arr2cardNumber, type SiMessage } from '../siProtocol.ts';
+import type { CardType } from '../output/ndjson.ts';
 import type { IRaceResultData } from './IRaceResultData.ts';
+import { RAW_LAYOUTS, snapshotBlocks, type RawPages } from './rawPages.ts';
 
 export interface ISiMainStation {
   sendMessage: (
@@ -119,6 +121,9 @@ export abstract class BaseSiCard {
    * cards (no series byte) and for cards instantiated directly via
    * `_decodeFromStorage` in tests. */
   public cardSeriesByte?: number;
+  /** Set by the class the detection command picked, not inferred from the number. */
+  abstract readonly cardType: CardType;
+  abstract readonly storage: { readonly data: ReadonlyArray<number | undefined> };
 
   constructor(cardNumber: number) {
     this.raceResult = { cardNumber };
@@ -134,6 +139,13 @@ export abstract class BaseSiCard {
    * instead. */
   read(): Promise<BaseSiCard> {
     return this.typeSpecificRead().then(() => this);
+  }
+
+  /** Copy of the blocks the reader fetched, as the station returned them.
+   * Call after `read()`; later changes to the card do not affect it. */
+  rawPages(): RawPages {
+    const { layout } = RAW_LAYOUTS[this.cardType as keyof typeof RAW_LAYOUTS];
+    return { cardType: this.cardType, layout, blocks: snapshotBlocks(this.storage.data) };
   }
 
   abstract typeSpecificRead(): Promise<void>;

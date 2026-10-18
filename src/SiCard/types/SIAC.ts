@@ -17,6 +17,7 @@ import { BaseSiCard } from '../BaseSiCard.ts';
 import { ModernSiCard } from './ModernSiCard.ts';
 
 export class SIAC extends ModernSiCard {
+  readonly cardType = 'SIAC' as const;
   static override readsBlock3 = true;
 
   /** Always read block 1 on SIAC (SPORTident (Thomas, 2026-10-13), answer 12),

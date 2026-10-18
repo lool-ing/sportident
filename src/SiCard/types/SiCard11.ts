@@ -8,6 +8,8 @@
 import { BaseSiCard } from '../BaseSiCard.ts';
 import { ModernSiCard } from './ModernSiCard.ts';
 
-export class SiCard11 extends ModernSiCard {}
+export class SiCard11 extends ModernSiCard {
+  readonly cardType = 'SI11' as const;
+}
 
 BaseSiCard.registerSi8Range(9_000_000, 10_000_000, SiCard11);

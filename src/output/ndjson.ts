@@ -111,7 +111,8 @@ export interface CardReadEvent extends NdjsonBase {
   software_version?: string;
   /** SIAC only (block 3): battery date "YYYY-MM-DD", no time zone. */
   battery_date?: string;
-  raw_pages_b64?: string;
+  /** Only with `--include-raw-pages`: the blocks the reader fetched, base64 each. */
+  raw_pages?: { layout: string; blocks: { block: number; b64: string }[] };
 }
 
 export interface CardRemovedEvent extends NdjsonBase {
@@ -228,9 +229,8 @@ export interface NdjsonEmitterOpts {
   /** Output sink. Defaults to a bound `process.stdout.write`. Tests inject a
    * capture function. */
   out?: (line: string) => void;
-  /** When true, `card_read` events include `raw_pages_b64` (the concatenated
-   * storage buffer base64-encoded). The `--include-raw-pages` flag
-   * toggles this. */
+  /** When true, `card_read` events include `raw_pages` (see `card.rawPages()`).
+   * The `--include-raw-pages` flag toggles this. */
   includeRawPages?: boolean;
 }
 
@@ -356,13 +356,14 @@ export class NdjsonEmitter {
       event.software_version = raceResult.softwareVersion;
     if (raceResult.batteryDate !== undefined) event.battery_date = raceResult.batteryDate;
     if (this.includeRawPages) {
-      // Best-effort: ModernSiCard / SiCard5 own a SiStorage with internalData
-      // accessible via storage.getInternalData() — but the storage type is
-      // private. Wire this when `--include-raw-pages` lands. For
-      // Phase 0 the flag is plumbed but the field is omitted to keep the
-      // discriminated-union shape clean. Future plan can populate by
-      // base64-encoding storage bytes.
-      // event.raw_pages_b64 = ...
+      const raw = card.rawPages();
+      event.raw_pages = {
+        layout: raw.layout,
+        blocks: raw.blocks.map((b) => ({
+          block: b.block,
+          b64: Buffer.from(b.bytes).toString('base64'),
+        })),
+      };
     }
     this._write(event);
   }

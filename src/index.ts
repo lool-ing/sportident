@@ -62,6 +62,14 @@ export { SiCard11 } from './SiCard/types/SiCard11.ts';
 export { SIAC } from './SiCard/types/SIAC.ts';
 export { ModernSiCard } from './SiCard/types/ModernSiCard.ts';
 export type { IRaceResultData, IPunch } from './SiCard/IRaceResultData.ts';
+export { RAW_LAYOUTS, RAW_BLOCK_SIZE } from './SiCard/rawPages.ts';
+export type {
+  RawPages,
+  RawBlock,
+  RawLayout,
+  RawLayoutName,
+  PersonalRange,
+} from './SiCard/rawPages.ts';
 
 // --- NDJSON output ----------------------------------------------------------
 export { NdjsonEmitter, toHalfDayClock } from './output/ndjson.ts';

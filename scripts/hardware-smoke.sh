@@ -108,8 +108,8 @@ for card_type in si5 si9 si10 siac; do
 
   # --once causes lool-readout to exit cleanly after a single cardRead.
   # --record writes the directional transcript + expected.json fixture pair.
-  # --include-raw-pages threads the flag through; Phase 0 currently omits the
-  # raw_pages_b64 field but the flag is in place for forward compatibility.
+  # --include-raw-pages threads the flag through; the card_read events then carry a
+  # raw_pages field.
   if ! node "$DIST_BIN" \
         --record "$BASENAME" --once --include-raw-pages \
         2> "${BASENAME}.stderr.log"; then

@@ -110,6 +110,7 @@ export const siCard6StorageDefinition = defineStorage(0x400, siCard6StorageLocat
 export class SiCard6 extends BaseSiCard {
   static maxNumPunches = MAX_NUM_PUNCHES;
 
+  readonly cardType = 'SI6' as const;
   public storage: SiStorage<ISiCard6StorageFields>;
   public punchCount?: number;
 

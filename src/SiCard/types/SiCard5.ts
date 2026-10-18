@@ -89,6 +89,7 @@ export const siCard5StorageDefinition = defineStorage(0x80, siCard5StorageLocati
 export class SiCard5 extends BaseSiCard {
   static maxNumPunches = MAX_NUM_PUNCHES;
 
+  readonly cardType = 'SI5' as const;
   public storage: SiStorage<ISiCard5StorageFields>;
   public punchCount?: number;
   public softwareVersion?: number;

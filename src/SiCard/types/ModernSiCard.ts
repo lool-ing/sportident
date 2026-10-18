@@ -242,7 +242,7 @@ export const modernSiCardStorageLocations: SiStorageLocations<IModernSiCardStora
 };
 export const modernSiCardStorageDefinition = defineStorage(0x400, modernSiCardStorageLocations);
 
-export class ModernSiCard extends BaseSiCard {
+export abstract class ModernSiCard extends BaseSiCard {
   static maxNumPunches = MAX_NUM_PUNCHES;
   /** Read block 3 (battery, versions); SPORTident's library reads it on
    * SIAC (SPORTident.Communication 2.59.0, black-box byte sweep of siac-bench-001, 2026-10-08). */

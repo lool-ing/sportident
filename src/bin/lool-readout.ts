@@ -44,7 +44,7 @@ import { replayFixture } from './replay.ts';
 //   --device <path>          Serial device (overrides $LOOL_DEVICE)
 //   --baud <38400|4800|auto> Serial rate (overrides $LOOL_BAUD, default 38400)
 //   --once                   Read one card then exit
-//   --include-raw-pages      Include raw_pages_b64 in card_read events
+//   --include-raw-pages      Include raw_pages (base64 per block) in card_read events
 //   --pretty                 Human-readable punch table instead of NDJSON
 //   --record <basename>      Tee NDJSON + directional wire transcript to disk.
 //                            Allowed roots: cwd OR /tmp.
@@ -72,7 +72,7 @@ Options:
   --baud <38400|4800|auto> Serial rate (overrides $LOOL_BAUD, default 38400). Some
                            stations only answer at 4800; auto tries 38400, then 4800
   --once                   Read a single card then exit cleanly
-  --include-raw-pages      Include raw_pages_b64 in card_read events
+  --include-raw-pages      Include raw_pages (base64 per block) in card_read events
   --pretty                 Print a human-readable punch table instead of NDJSON
                            (ignored with --record and --replay)
   --record <basename>      Tee NDJSON to <basename>.expected.json AND capture

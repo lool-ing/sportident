@@ -116,6 +116,7 @@ export const siCard9StorageDefinition = defineStorage(0x100, siCard9StorageLocat
 
 export class SiCard9 extends ModernSiCard {
   static maxNumPunches = MAX_NUM_PUNCHES;
+  readonly cardType = 'SI9' as const;
   public storage: SiStorage<ISiCard9StorageFields>;
 
   constructor(cardNumber: number) {
