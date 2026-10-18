@@ -73,7 +73,9 @@ export const RAW_LAYOUTS: Record<
       holder(0x80, 0xfb),
     ],
   },
-  SI8: { layout: 'si8', personalRangesVerified: true, personal: [uid, holder(0x20, 0x7f)] },
+  // Owner area runs to 0x87, past the decoder's 0x60 bytes; punches start at
+  // 0x88, per SPORTident card data structure document.
+  SI8: { layout: 'si8', personalRangesVerified: true, personal: [uid, holder(0x20, 0x87)] },
   SI9: { layout: 'si9', personalRangesVerified: true, personal: [uid, holder(0x20, 0x37)] },
   SI10: modern,
   SI11: modern,

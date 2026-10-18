@@ -80,7 +80,7 @@ personal data, so a consumer can blank them before storing:
 | ---------------- | -------------------- | --------- |
 | SI5              | 0x01-0x03            |           |
 | SI6, SI6*        | 0x30-0x7F, 0x80-0xFB |           |
-| SI8              | 0x20-0x7F            | 0x00-0x03 |
+| SI8              | 0x20-0x87            | 0x00-0x03 |
 | SI9              | 0x20-0x37            | 0x00-0x03 |
 | SI10, SI11, SIAC | 0x20-0x9F            | 0x00-0x03 |
 
