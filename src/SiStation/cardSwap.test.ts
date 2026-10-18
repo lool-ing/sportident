@@ -189,3 +189,66 @@ describe('SiMainStation: NAK retry', () => {
     assert.deepEqual(r.log, ['GET p0 A', 'GET p4 A']);
   });
 });
+
+describe('SiMainStation: the same card detected again before removal', () => {
+  /** Drive one station through `steps` (bytes injected after `ms`, then
+   * optionally a card change), recording station events in the fake's log. */
+  const script = async (
+    steps: { ms: number; bytes: number[]; card?: Card }[],
+    naks: Record<string, number> = {}
+  ): Promise<string[]> => {
+    const fake = new FakeStation({}, naks);
+    const station = new SiMainStation(fake);
+    station.on('cardInserted', (c: BaseSiCard) => fake.log.push(`inserted ${c.cardNumber}`));
+    station.on('cardRead', (c: BaseSiCard) => fake.log.push(`read ${c.cardNumber}`));
+    station.on('error', (e: Error) => fake.log.push(`error ${e.message}`));
+    for (const step of steps) {
+      await new Promise((r) => setTimeout(r, step.ms));
+      if (step.card !== undefined || step.bytes === REM_A) fake.onStation = step.card;
+      fake.inject(step.bytes);
+    }
+    await new Promise((r) => setTimeout(r, 200));
+    await station.close();
+    return fake.log;
+  };
+  const DET_A = det(a, 0x0f);
+  const REM_A = rem(a);
+  const READ_A = ['inserted ' + a, 'GET p0 A', 'GET p4 A', 'ACK', 'read ' + a];
+
+  test('read → DET again → only an ACK → SI_REM → DET → a new read', async () => {
+    const log = await script([
+      { ms: 0, bytes: DET_A },
+      { ms: 100, bytes: DET_A },
+      { ms: 100, bytes: REM_A },
+      { ms: 100, bytes: DET_A, card: 'A' },
+    ]);
+    assert.deepEqual(log, [...READ_A, 'ACK', ...READ_A]);
+  });
+
+  test('another card detected without SI_REM is read', async () => {
+    const log = await script([
+      { ms: 0, bytes: DET_A },
+      { ms: 100, bytes: det(b, 0x01), card: 'B' },
+    ]);
+    assert.deepEqual(log, [...READ_A, 'inserted ' + b, ...B_PAGES, 'ACK', 'read ' + b]);
+  });
+
+  test('after a failed read, the same card detected again is read', async () => {
+    const log = await script(
+      [
+        { ms: 0, bytes: DET_A },
+        { ms: 1200, bytes: DET_A },
+      ],
+      { 'A:4': 3 }
+    );
+    assert.deepEqual(log, [
+      'inserted ' + a,
+      'GET p0 A',
+      'GET p4 A',
+      'GET p4 A',
+      'GET p4 A',
+      'error NAK',
+      ...READ_A,
+    ]);
+  });
+});

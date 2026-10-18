@@ -59,6 +59,10 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
   private isClosed = false;
   /** The card whose read is in flight, if any. */
   private readingCard: BaseSiCard | undefined;
+  /** The card last read and ACKed, until SI_REM or another card: a new detect
+   * of it only gets an ACK, no read and no events (the station sends one when
+   * the card is put back without being taken away). */
+  private ackedCardNumber: number | undefined;
   /** Ends the wait before a NAK retry at once (the card left). */
   private cancelNakWait: (() => void) | undefined;
 
@@ -175,6 +179,7 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
     if (message.mode !== undefined) return;
     // SI_REM: card removed.
     if (message.command === proto.cmd.SI_REM) {
+      this.ackedCardNumber = undefined;
       this._abortRead();
       // params layout matches SI5_DET / SI8_DET — bytes 3..5 carry the card number.
       const card = BaseSiCard.detectFromMessage({
@@ -204,8 +209,13 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
       message.command === proto.cmd.SI6_DET ||
       message.command === proto.cmd.SI8_DET
     ) {
-      this._abortRead();
       const card = BaseSiCard.detectFromMessage(message);
+      if (card && card.cardNumber === this.ackedCardNumber) {
+        this.multiplexer.sendBareAck().catch((err: Error) => this.emit('error', err));
+        return;
+      }
+      this.ackedCardNumber = undefined;
+      this._abortRead();
       if (!card) return;
       card.mainStation = {
         sendMessage: (msg, expected, timeout) => this._sendForCard(card, msg, expected, timeout),
@@ -229,6 +239,7 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
           // the station may already hold the next card.
           if (this.readingCard !== card) return;
           this.readingCard = undefined;
+          this.ackedCardNumber = card.cardNumber;
           return this.multiplexer.sendBareAck();
         })
         .then(() => this.emit('cardRead', card))
