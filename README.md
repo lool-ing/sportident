@@ -79,12 +79,12 @@ personal data, so a consumer can blank them before storing:
 | Card             | Holder               | UID       |
 | ---------------- | -------------------- | --------- |
 | SI5              | 0x01-0x03            |           |
-| SI6, SI6*        | 0x30-0x7F, 0x80-0xFB |           |
+| SI6, SI6*        | 0x28-0x7F, 0x80-0xFB |           |
 | SI8              | 0x20-0x87            | 0x00-0x03 |
 | SI9              | 0x20-0x37            | 0x00-0x03 |
 | SI10, SI11, SIAC | 0x20-0x9F            | 0x00-0x03 |
 
-SI6 keeps the holder's name, country and club in block 0 and the rest
+SI6 keeps the owner's programmed start number, name, country and club in block 0 and the rest
 (phone, e-mail, address, birth date) in block 1, which the reader never
 fetches; both ranges are listed. SI6 has no chip serial. The ranges are
 tested not to overlap any decoded race field (times, codes, punches,

@@ -303,7 +303,7 @@ describe('personal-data ranges leave the race fields alone', () => {
 
   test('SI6 lists its holder ranges; every layout is verified', () => {
     assert.deepStrictEqual(RAW_LAYOUTS.SI6.personal, [
-      { kind: 'holder', from: 0x30, to: 0x7f },
+      { kind: 'holder', from: 0x28, to: 0x7f },
       { kind: 'holder', from: 0x80, to: 0xfb },
     ]);
     for (const t of Object.keys(RAW_LAYOUTS) as (keyof typeof RAW_LAYOUTS)[]) {

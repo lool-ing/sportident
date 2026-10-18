@@ -60,13 +60,15 @@ export const RAW_LAYOUTS: Record<
 > = {
   SI5: { layout: 'si5', personalRangesVerified: true, personal: [holder(0x01, 0x03)] },
   // SI6 and SI6* share this layout. No chip serial: 0x00-0x03 is the layout
-  // version. Start number 0x28-0x2B and clear record 0x20-0x23 stay.
+  // version. The clear record 0x20-0x23 stays.
   SI6: {
     layout: 'si6',
     personalRangesVerified: true,
     personal: [
-      // Block 0: names, country and club, per SPORTident card data structure document.
-      holder(0x30, 0x7f),
+      // Block 0: the owner's programmed start number (0x28-0x2B; no decoder
+      // reads it), 4 undefined bytes, then names, country and club, per
+      // SPORTident card data structure document.
+      holder(0x28, 0x7f),
       // Block 1, never fetched: user id, phone, e-mail, address, sex, birth
       // date; production date 0xFC-0xFF left out, per SPORTident card data
       // structure document.
