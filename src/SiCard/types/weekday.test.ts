@@ -109,6 +109,18 @@ describe('day of week (PTD bits 3-1)', () => {
     assert.equal(ev.start.weekday_raw, 3);
   });
 
+  test('NDJSON: the day of week does not depend on a valid time', () => {
+    const card = new SIAC(0);
+    card._decodeFromStorage(withWeekdays());
+    // A punch whose time is not valid (eg out of range) still has its day.
+    (card.raceResult.punches as { time: number | null }[])[3]!.time = null;
+    const lines: string[] = [];
+    new NdjsonEmitter({ device_path: 'x', out: (l) => lines.push(l) }).card_read({ card });
+    const p = JSON.parse(lines[0] as string).punches[3];
+    assert.equal(p.weekday, 3);
+    assert.equal(p.weekday_raw, 3);
+  });
+
   test('NDJSON: SI5 punch has weekday null and no weekday_raw', () => {
     const card = new SiCard5(0);
     card._decodeFromStorage(si5.storageData as number[]);

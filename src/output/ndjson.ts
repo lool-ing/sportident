@@ -290,14 +290,15 @@ export class NdjsonEmitter {
     };
     const c = card as WithCounts;
     const punches = (raceResult.punches ?? []).map((p): NdjsonPunch => {
-      const clock = toHalfDayClock(p.time, undefined, undefined, p.weekdayRaw);
+      const clock = toHalfDayClock(p.time);
       return {
         code: p.code,
         // A missing time stays null so a code-only punch differs from 00:00:00.
         seconds_in_half_day: clock?.seconds_in_half_day ?? null,
         half_day: clock?.half_day ?? null,
-        weekday: clock?.weekday ?? null,
-        ...(clock?.weekday_raw !== undefined && { weekday_raw: clock.weekday_raw }),
+        // The day of week stands on its own: a punch without a valid time keeps it.
+        weekday: p.weekdayRaw === undefined ? null : dayOfWeekFromRaw(p.weekdayRaw),
+        ...(p.weekdayRaw !== undefined && { weekday_raw: p.weekdayRaw }),
       };
     });
     const event: CardReadEvent = {
