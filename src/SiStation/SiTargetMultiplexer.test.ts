@@ -147,4 +147,37 @@ describe('SiTargetMultiplexer: send-queue lifecycle', () => {
       await mux.close();
     });
   }
+
+  test('a partial frame left by a timed-out command is dropped; the next command gets its own reply', async () => {
+    const transport = new SilentTransport();
+    const mux = new SiTargetMultiplexer(transport);
+    const page4 = (fill: number): number[] =>
+      renderFrame(proto.cmd.GET_SI8, [0x00, 0x0a, 0x04, ...new Array<number>(128).fill(fill)]);
+    const first = mux.sendMessage({ command: proto.cmd.GET_SI8, parameters: [0x04] }, 1, 50);
+    transport.inject([0x02, 0xef, 0xff, ...page4(0x11)]); // noise swallows the reply
+    await assert.rejects(first, SendTimeoutError);
+    const again = mux.sendMessage({ command: proto.cmd.GET_SI8, parameters: [0x04] }, 1, 200);
+    transport.inject(page4(0x22));
+    assert.strictEqual((await again)[0]?.[5], 0x22, "the retry's own reply, not the old one");
+    await mux.close();
+  });
+
+  test('a good reply split over three deliveries still pairs', async () => {
+    const transport = new SilentTransport();
+    const mux = new SiTargetMultiplexer(transport);
+    const reply = renderFrame(proto.cmd.GET_SI8, [
+      0x00,
+      0x0a,
+      0x00,
+      ...new Array<number>(128).fill(0x33),
+    ]);
+    const pending = mux.sendMessage({ command: proto.cmd.GET_SI8, parameters: [0x00] }, 1, 200);
+    const half = Math.floor(reply.length / 2);
+    for (const piece of [reply.slice(0, 1), reply.slice(1, half), reply.slice(half)]) {
+      transport.inject(piece);
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    assert.strictEqual((await pending)[0]?.[5], 0x33);
+    await mux.close();
+  });
 });

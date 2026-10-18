@@ -25,7 +25,7 @@ import { proto } from '../constants.ts';
 import { parseAll, render, type FrameError, type SiMessage } from '../siProtocol.ts';
 import { EventEmitter } from '../utils/events.ts';
 import type { ISerialTransport } from '../transport/ISerialTransport.ts';
-import { DeviceClosedError, NakError } from '../transport/errors.ts';
+import { DeviceClosedError, NakError, SendTimeoutError } from '../transport/errors.ts';
 import { SiSendTask } from './SiSendTask.ts';
 
 const RECEIVE_BUFFER_CAP_BYTES = 64 * 1024;
@@ -93,7 +93,13 @@ export class SiTargetMultiplexer extends EventEmitter {
     // for `await sendMessage(...)` rejecting on timeout), this chained
     // promise has no handler and triggers an unhandledRejection. The catch
     // is a no-op — the caller already saw the rejection on `task.promise`.
-    task.promise.finally(() => this._removeTask(task)).catch(() => undefined);
+    task.promise
+      .finally(() => this._removeTask(task))
+      .catch((err: unknown) => {
+        // No reply in time: bytes left over (eg noise like 02 EF FF in front of
+        // the reply) would swallow or shift later frames. Drop them.
+        if (err instanceof SendTimeoutError) this.receiveBuffer = [];
+      });
 
     // Chain transport.send onto sendChain so consecutive sendMessage calls
     // serialize their wire transmissions. Errors do NOT poison the queue —

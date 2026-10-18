@@ -388,3 +388,28 @@ describe('SiMainStation: an ACK queued behind a draining write', () => {
     assert.deepEqual(fake.log, ['GET p0 A', 'GET p4 A', 'ACK', 'ACK', ...B_PAGES, 'ACK']);
   });
 });
+
+describe('SiMainStation: line noise in front of a reply', () => {
+  test('02 EF FF before the page-4 reply: the read times out, the next card is read', async () => {
+    const r = await run(
+      {
+        'A:4': (fake) => {
+          setTimeout(() => {
+            fake.onStation = 'B';
+            fake.inject([...rem(a), ...det(b, 0x01)]);
+          }, 2200);
+          return {
+            extra: [0x02, 0xef, 0xff, ...page(A.storageData as number[], 4)],
+            next: 'A',
+            drop: true,
+          };
+        },
+      },
+      {},
+      2700
+    );
+    assert.deepEqual(r.read, [b]);
+    assert.deepEqual(r.errors, ['Send timed out after 2000ms (command 0xEF)']);
+    assert.deepEqual(r.log, ['GET p0 A', 'GET p4 A', ...B_PAGES, 'ACK']);
+  });
+});
