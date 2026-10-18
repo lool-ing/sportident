@@ -57,6 +57,39 @@ Other entry points, all exported from the package root:
 - `NdjsonEmitter` writes card events as one JSON object per line.
 - `parse`, `render`, `CRC16` and `proto` for the wire protocol.
 
+## Raw pages
+
+After a successful read, `card.rawPages()` returns a copy of the blocks the
+reader fetched, exactly as the station returned them:
+
+```ts
+const { cardType, layout, blocks } = card.rawPages();
+// blocks: { block: number; bytes: Uint8Array /* 128 bytes */ }[]
+```
+
+`cardType` is the type the detection command chose, not a guess from the card
+number. A block that is not listed was never read; a listed block is complete.
+`lool-readout --include-raw-pages` adds the same data to each `card_read` line
+as `raw_pages: { layout, blocks: [{ block, b64 }] }`.
+
+The library does not sanitise. `RAW_LAYOUTS[cardType].personal` lists the
+card addresses (`block * 128 + offset`, both ends inclusive) that hold
+personal data, so a consumer can blank them before storing:
+
+| Card             | Holder       | UID          |
+| ---------------- | ------------ | ------------ |
+| SI5              | 0x01-0x03    |              |
+| SI8              | 0x20-0x7F    |              |
+| SI9              | 0x20-0x37    |              |
+| SI10, SI11, SIAC | 0x20-0x9F    | 0x00-0x03    |
+| SI6              | not verified | not verified |
+
+SI6 exports no ranges and `personalRangesVerified` is `false`: its holder
+layout is unknown, so do not treat an empty list as "no personal data". The
+ranges are tested not to overlap any decoded race field (times, codes,
+punches, subseconds, SIAC reserve records and block-1 codes). SI8 and SI9
+cards also carry the UID at 0x00-0x03; it is not listed for them.
+
 ## Command line
 
 - `lool-readout` prints every card read as NDJSON on stdout.
