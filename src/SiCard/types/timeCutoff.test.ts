@@ -8,6 +8,8 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { SiCard10 } from './SiCard10.ts';
+import { cropPunches as cropModern } from './ModernSiCard.ts';
+import { cropPunches as cropSi6 } from './SiCard6.ts';
 import { SiCard5 } from './SiCard5.ts';
 import { SiCard6 } from './SiCard6.ts';
 import { fixture as si10 } from '../../../tests/fixtures/upstream/si10-typical.ts';
@@ -97,5 +99,19 @@ describe('12-hour time cutoff', () => {
       p.slice(0, 2).map((x) => x.time),
       [null, 43199]
     );
+  });
+
+  test('cropPunches keeps the other fields of a punch (eg its day of week)', () => {
+    const slots = [
+      { code: 31, time: 100, weekdayRaw: 2 },
+      { code: 32, time: undefined, weekdayRaw: 3 }, // out of range
+      { code: undefined, time: null }, // empty: ends the list
+    ];
+    const kept = [
+      { code: 31, time: 100, weekdayRaw: 2 },
+      { code: 32, time: null, weekdayRaw: 3 },
+    ];
+    assert.deepEqual(cropModern(slots as never), kept);
+    assert.deepEqual(cropSi6(slots as never), kept);
   });
 });

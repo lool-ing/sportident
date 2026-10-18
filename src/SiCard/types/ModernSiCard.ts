@@ -84,7 +84,9 @@ export const getPunchOffset = (i: number): number => bytesPerPage * 4 + i * 4;
  * range (43200 and up) stays as `time: null`, so the punches after it are kept. */
 export const cropPunches = (allPunches: (PotentialModernSiCardPunch | undefined)[]): IPunch[] => {
   const end = allPunches.findIndex((p) => p?.code === undefined || p.time === null);
+  // Keep every other field of the punch; only a missing time becomes null.
   return (end === -1 ? allPunches : allPunches.slice(0, end)).map((p) => ({
+    ...p!,
     code: p!.code!,
     time: p!.time ?? null,
   }));
