@@ -33,8 +33,16 @@ params = 5-byte header `00 02 00 01 00` (CN1 CN0 ADR2 ADR1 ADR0) + 128 data byte
 
 8-byte records, oldest first. Each record:
 bytes 0..2 : SI card number, big-endian (3 bytes)
-bytes 3..4 : fixed `69 69` marker
-bytes 5..7 : punch time (monotonic increasing across records → confirms align)
+bytes 3..4 : DATE1 DATE0 (here `69 69` = 2026-05-20, pm)
+bytes 5..6 : TH TL, seconds in the 12-hour half day (0..43199)
+byte 7 : MS, 1/256 s
+
+Source: SPORTident PC Programmer's Guide 5, backup memory data format
+(extended-protocol flag set, firmware 5.55+). DATE1 bits 7-2 = year (2000+),
+bits 1-0 = month bits 3-2; DATE0 bits 7-6 = month bits 1-0, bits 5-1 = day,
+bit 0 = pm. The 6-byte record of the flag-off format is not covered.
+Bytes 5..7 read as one big-endian number (`rawTime`) rise here only because
+all 16 punches fall in the same half day; across noon it jumps back.
 
 16 records in this block (card = bytes 0..2 BE):
 1 1a 22 e1 = 1712865
@@ -56,9 +64,8 @@ bytes 5..7 : punch time (monotonic increasing across records → confirms align)
 
 Cross-check: card 8700617 punched the start
 check 3×. The first-3-bytes-BE decode is correct for these cards (all
-≤ 0x98967F = 9999999, fit in 3 bytes). NOTE: this `69 69`-marker layout may be
-station-config-specific; revisit if a station holds SIAC/8-digit cards that
-exceed 3 bytes.
+≤ 0x98967F = 9999999, fit in 3 bytes). NOTE: revisit if a station holds SIAC/8-digit cards
+that exceed 3 bytes.
 
 ## Bugs in the ORIGINAL readBackup.ts this capture exposes
 

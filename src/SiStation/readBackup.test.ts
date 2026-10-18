@@ -7,7 +7,7 @@
 // (block walking, MAX_ITERATIONS cap, empty memory).
 //
 // Record layout (8 bytes): card = bytes 0..2 (arr2cardNumber, LSB-first);
-// bytes 3..4 = 0x69 0x69 marker; bytes 5..7 = punch time.
+// bytes 3..4 = DATE1 DATE0 (0x69 0x69 = 2026-05-20 pm); bytes 5..7 = TH TL MS.
 
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -41,7 +41,7 @@ function makeData(cards: number[]): number[] {
   const out: number[] = [];
   for (let i = 0; i < cards.length; i++) {
     const [a, b, c] = cardBytes(cards[i]!);
-    // bytes 0..2 card, 3..4 marker, 5..7 time (use i as a monotonic stub)
+    // bytes 0..2 card, 3..4 date, 5..7 time (i as a stub)
     out.push(a, b, c, 0x69, 0x69, 0x00, 0x00, i & 0xff);
   }
   // Pad to BLOCK_SIZE with zero records (empty slots).

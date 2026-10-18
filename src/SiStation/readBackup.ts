@@ -48,12 +48,21 @@ const BACKUP_POINTER_LEN = 0x07;
 const SYSVAL_PAYLOAD_HEADER = 3; // CN1, CN0, ADDR-echo
 const BACKUP_PAYLOAD_HEADER = 5; // CN1, CN0, ADR2, ADR1, ADR0
 const FRAME_HEADER = 2; // cmd, len
+const HALF_DAY_SECONDS = 43200;
 
-// Per-record layout within the backup data (8-byte records, hardware-verified
-// 2026-06-01 — see __fixtures__/coupled-backup-golden.md):
-//   bytes 0..2 : SI card number (3-byte field, decoded via arr2cardNumber)
-//   bytes 3..4 : fixed 0x69 0x69 marker
-//   bytes 5..7 : punch time (monotonic)
+// Per-record layout within the backup data (8-byte records, extended protocol
+// flag set, firmware 5.55+; SPORTident PC Programmer's Guide 5, backup memory
+// data format; card layout hardware-verified 2026-06-01 — see
+// __fixtures__/coupled-backup-golden.md):
+//   bytes 0..2 : SI2 SI1 SI0, card number (decoded via arr2cardNumber)
+//   bytes 3..4 : DATE1 DATE0
+//                DATE1 bits 7-2: year 0-63 (2000+); bits 1-0: month bits 3-2
+//                DATE0 bits 7-6: month bits 1-0; bits 5-1: day 1-31;
+//                      bit 0: 1 = pm half day
+//   bytes 5..6 : TH TL, seconds in the 12-hour half day (0..43199)
+//   byte 7     : MS, 1/256 s
+// With the extended-protocol flag off the record is 6 bytes in another order;
+// that format is not supported here.
 
 // ---------------------------------------------------------------------------
 // Types
@@ -64,9 +73,31 @@ export interface BackupRecord {
   /** SI card number (non-zero; zero-card records are skipped). Decoded with the
    * canonical arr2cardNumber so it matches the live card-read path. */
   cardNumber: number;
-  /** Raw 3-byte punch-time field (bytes 5..7 of the record) as a big-endian
-   * integer. Monotonic across a block; used for ordering, not wall-clock. */
+  /** Raw TH TL MS (bytes 5..7 of the record) as a big-endian integer, i.e.
+   * `secondsInHalfDay * 256 + subSecond`. It is a 12-hour clock: it is NOT
+   * monotonic and must not be used for ordering across noon or days (it jumps
+   * back at 12:00). Order by `dateTime` or by date plus `secondsSinceMidnight`. */
   rawTime: number;
+  /** Year (2000-2063), or null when the record's date is not a real date. */
+  year: number | null;
+  /** Month 1-12, or null when the date is invalid. */
+  month: number | null;
+  /** Day of month, or null when the date is invalid. */
+  day: number | null;
+  /** Which half of the day `secondsInHalfDay` counts in. */
+  halfDay: 'am' | 'pm';
+  /** TH TL: seconds since the last midnight or noon, 0..43199 (larger values
+   * are out of range and make `dateTime` null). */
+  secondsInHalfDay: number;
+  /** MS: 1/256 s, 0..255. */
+  subSecond: number;
+  /** Seconds since midnight (`secondsInHalfDay` + 43200 if pm), or null when
+   * the date or time is invalid. */
+  secondsSinceMidnight: number | null;
+  /** Local date and time as `YYYY-MM-DDTHH:MM:SS.mmm`, no time zone; sorts
+   * lexicographically in time order. Null when the date or time is invalid.
+   * Milliseconds are floor(subSecond * 1000 / 256). */
+  dateTime: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -92,8 +123,7 @@ export function parseBackupPointerFrame(frame: number[]): number {
 /**
  * Parse a GET_BACKUP response FRAME into BackupRecord[]. Frame shape:
  * `[cmd, len, CN1, CN0, ADR2, ADR1, ADR0, ...data]`. The data is a run of
- * 8-byte records; card number = bytes 0..2 via arr2cardNumber; bytes 5..7 are
- * the punch time. Zero-card records (empty slots) are skipped; a trailing
+ * 8-byte records (see parseBackupBlock for the layout). Zero-card records (empty slots) are skipped; a trailing
  * partial record is ignored.
  */
 export function parseBackupDataFrame(frame: number[]): BackupRecord[] {
@@ -109,14 +139,17 @@ export function parseBackupDataFrame(frame: number[]): BackupRecord[] {
  * Parse the DATA portion of a GET_BACKUP block into BackupRecord[]. `block` is
  * the record bytes only (header already stripped by parseBackupDataFrame).
  *
- * Layout (hardware-verified 2026-06-01, BSF8 check unit — see
+ * Layout (SPORTident PC Programmer's Guide 5, backup memory data format;
+ * card bytes hardware-verified 2026-06-01, BSF8 check unit — see
  * __fixtures__/coupled-backup-golden.md):
  *   bytes 0..2 : SI card number (3-byte field). Decoded with arr2cardNumber
  *     (LSB-first) so legacy SI5 numbers match the live card-read path — plain
  *     big-endian is WRONG for cards whose high byte ≤ 4 (e.g. 0x01413a is
  *     116698, not 82234).
- *   bytes 3..4 : fixed 0x69 0x69 marker (not interpreted).
- *   bytes 5..7 : punch time, big-endian (monotonic; ordering only).
+ *   bytes 3..4 : DATE1 DATE0 (year, month, day, am/pm), see the layout above.
+ *   bytes 5..7 : TH TL MS, 12-hour clock; kept as `rawTime` and decoded.
+ * An impossible date (month 0 or > 12, day 0, Feb 30...) does not throw: the
+ * date fields and `dateTime` are null.
  * Records with cardNumber 0 are empty slots and are skipped. A trailing partial
  * record (fewer than recLen bytes) is ignored.
  *
@@ -139,12 +172,47 @@ export function parseBackupBlock(block: Uint8Array, recLen: number): BackupRecor
     const cardNumber = arr2cardNumber([b2, b1, b0]) ?? 0;
     if (cardNumber === 0) continue;
 
-    // Punch time: 3-byte field at bytes 5..7, big-endian. Used only for
-    // ordering within a block, not as a wall-clock time.
-    const rawTime =
-      ((block[offset + 5]! << 16) | (block[offset + 6]! << 8) | block[offset + 7]!) >>> 0;
+    const date1 = block[offset + 3]!;
+    const date0 = block[offset + 4]!;
+    const secondsInHalfDay = (block[offset + 5]! << 8) | block[offset + 6]!;
+    const subSecond = block[offset + 7]!;
+    const rawTime = ((secondsInHalfDay << 8) | subSecond) >>> 0;
+    const halfDay = date0 & 1 ? 'pm' : 'am';
+    const y = 2000 + (date1 >> 2);
+    const m = ((date1 & 3) << 2) | (date0 >> 6);
+    const d = (date0 >> 1) & 0x1f;
 
-    records.push({ cardNumber, rawTime });
+    // Reject impossible dates by round-tripping through Date (UTC, no zone use).
+    const probe = new Date(Date.UTC(y, m - 1, d));
+    const dateOk =
+      m >= 1 &&
+      probe.getUTCFullYear() === y &&
+      probe.getUTCMonth() === m - 1 &&
+      probe.getUTCDate() === d;
+    const timeOk = secondsInHalfDay < HALF_DAY_SECONDS;
+    const secondsSinceMidnight =
+      dateOk && timeOk ? secondsInHalfDay + (halfDay === 'pm' ? HALF_DAY_SECONDS : 0) : null;
+    let dateTime: string | null = null;
+    if (secondsSinceMidnight !== null) {
+      const t = (n: number, w = 2) => String(n).padStart(w, '0');
+      dateTime =
+        `${t(y, 4)}-${t(m)}-${t(d)}T${t(Math.floor(secondsSinceMidnight / 3600))}:` +
+        `${t(Math.floor(secondsSinceMidnight / 60) % 60)}:${t(secondsSinceMidnight % 60)}.` +
+        t(Math.floor((subSecond * 1000) / 256), 3);
+    }
+
+    records.push({
+      cardNumber,
+      rawTime,
+      year: dateOk ? y : null,
+      month: dateOk ? m : null,
+      day: dateOk ? d : null,
+      halfDay,
+      secondsInHalfDay,
+      subSecond,
+      secondsSinceMidnight,
+      dateTime,
+    });
   }
   return records;
 }

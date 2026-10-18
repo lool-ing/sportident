@@ -14,7 +14,8 @@
 //     is the big-endian uint32 EP3 EP2 EP1 EP0.
 //   - The GET_BACKUP response FRAME is [cmd, len, CN1, CN0, ADR2, ADR1, ADR0,
 //     ...128 data]. Records are 8 bytes; card number = bytes 0..2 big-endian;
-//     bytes 3..4 are a fixed 0x69 0x69 marker; bytes 5..7 are the punch time.
+//     bytes 3..4 are DATE1 DATE0 (0x69 0x69 = 2026-05-20, pm); bytes 5..7 are
+//     TH TL MS (SPORTident PC Programmer's Guide 5, backup memory data format).
 
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -81,13 +82,16 @@ describe('backup hardware capture', () => {
     assert.equal(count, 3, 'card 8700617 punched the start check three times');
   });
 
-  test('parseBackupDataFrame: punch times are monotonically increasing', () => {
-    // Sanity that the 8-byte stride is aligned: punch times (bytes 5..7) rise.
+  test('parseBackupDataFrame: all records are 2026-05-20 pm and times rise', () => {
+    // Sanity that the 8-byte stride is aligned. rawTime only rises here because
+    // every punch is in the same half day; dateTime is the safe ordering key.
     const records = parseBackupDataFrame(BACKUP_FRAME);
-    for (let i = 1; i < records.length; i++) {
-      const prev = records[i - 1]!.rawTime;
-      const cur = records[i]!.rawTime;
-      assert.ok(cur >= prev, `record ${i} time ${cur} should be >= ${prev}`);
+    for (let i = 0; i < records.length; i++) {
+      assert.equal(records[i]!.dateTime?.slice(0, 10), '2026-05-20');
+      assert.equal(records[i]!.halfDay, 'pm');
+      if (i === 0) continue;
+      assert.ok(records[i]!.rawTime >= records[i - 1]!.rawTime);
+      assert.ok(records[i]!.dateTime! >= records[i - 1]!.dateTime!);
     }
   });
 
