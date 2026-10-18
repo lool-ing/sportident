@@ -44,7 +44,8 @@ export const cropPunches = (allPunches: (PotentialSiCard5Punch | undefined)[]): 
   const firstInvalidIndex = allPunches.findIndex((punch) => !isPunchEntryValid(punch));
   const punchesUntilInvalid =
     firstInvalidIndex === -1 ? allPunches : allPunches.slice(0, firstInvalidIndex);
-  return punchesUntilInvalid.filter(isPunchEntryValid);
+  // A time out of range (43200 and up) is no time, like slots 31-36.
+  return punchesUntilInvalid.filter(isPunchEntryValid).map((p) => ({ ...p, time: p.time ?? null }));
 };
 
 export interface ISiCard5StorageFields extends IBaseSiCardStorageFields {

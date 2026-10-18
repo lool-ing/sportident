@@ -420,7 +420,8 @@ export class SiTime extends SiDataType<SiTimestamp> {
     if (this.intField === undefined) return null;
     const timeInt = this.intField.typeSpecificExtractFromData(data);
     if (timeInt === proto.NO_TIME) return null;
-    if (timeInt === undefined || timeInt > SI_TIME_CUTOFF) return undefined;
+    // A 12-hour time runs 0..43199; 43200 and up is no valid time.
+    if (timeInt === undefined || timeInt >= SI_TIME_CUTOFF) return undefined;
     const ptd = this.ptdField?.typeSpecificExtractFromData(data);
     return ptd !== undefined && (ptd & 0x01) === 1 ? timeInt + SI_TIME_CUTOFF : timeInt;
   }

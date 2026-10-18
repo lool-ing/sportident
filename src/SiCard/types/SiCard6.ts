@@ -38,16 +38,14 @@ interface PotentialSiCard6Punch {
 /** Punches live in blocks 6 and 7, 4 bytes each: [ptd, code, time_hi, time_lo]. */
 export const getPunchOffset = (i: number): number => bytesPerPage * 6 + i * 4;
 
+/** Punches up to the first empty slot (no code, or time 0xEEEE). A time out of
+ * range (43200 and up) stays as `time: null`, so the punches after it are kept. */
 export const cropPunches = (allPunches: (PotentialSiCard6Punch | undefined)[]): IPunch[] => {
-  const isPunchEntryValid = (punch: PotentialSiCard6Punch | undefined): punch is IPunch =>
-    punch !== undefined &&
-    punch.code !== undefined &&
-    punch.time !== undefined &&
-    punch.time !== null;
-  const firstInvalidIndex = allPunches.findIndex((punch) => !isPunchEntryValid(punch));
-  const punchesUntilInvalid =
-    firstInvalidIndex === -1 ? allPunches : allPunches.slice(0, firstInvalidIndex);
-  return punchesUntilInvalid.filter(isPunchEntryValid);
+  const end = allPunches.findIndex((p) => p?.code === undefined || p.time === null);
+  return (end === -1 ? allPunches : allPunches.slice(0, end)).map((p) => ({
+    code: p!.code!,
+    time: p!.time ?? null,
+  }));
 };
 
 /** Station code of an SI6 start/finish record. With PTD bit 7 set CN holds the
