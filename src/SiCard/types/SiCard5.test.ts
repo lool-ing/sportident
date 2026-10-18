@@ -15,7 +15,7 @@ import { fixture as si5_full } from '../../../tests/fixtures/upstream/si5-full.t
 // {raceResult + class fields} shape that fixture.cardData expresses.
 function decodeSi5(storage: (number | undefined)[]): { [k: string]: unknown } {
   const card = new SiCard5(0);
-  card._decodeFromStorage(storage);
+  card.decodeFromStorage(storage);
   return {
     cardNumber: card.raceResult.cardNumber,
     startTime: card.raceResult.startTime ?? null,

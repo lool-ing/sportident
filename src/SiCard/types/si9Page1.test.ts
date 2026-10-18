@@ -45,7 +45,7 @@ const liveRead = async (mem: number[]): Promise<{ pages: number[]; card: SiCard9
 
 const fullDecode = (mem: number[]): SiCard9 => {
   const card = new SiCard9(0);
-  card._decodeFromStorage(mem);
+  card.decodeFromStorage(mem);
   return card;
 };
 

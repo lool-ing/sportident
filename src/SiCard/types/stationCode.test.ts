@@ -19,7 +19,7 @@ import { fixture as si5 } from '../../../tests/fixtures/upstream/si5-full.ts';
 import { toHalfDayClock } from '../../output/ndjson.ts';
 
 interface Decodable {
-  _decodeFromStorage(bytes: (number | undefined)[]): void;
+  decodeFromStorage(bytes: (number | undefined)[]): void;
   raceResult: {
     startTime?: number | null;
     finishTime?: number | null;
@@ -43,7 +43,7 @@ describe('station codes of start, finish and check', () => {
     setRecord(bytes, 0x10, 10);
     setRecord(bytes, 0x08, 22);
     const card: Decodable = new SiCard10(0);
-    card._decodeFromStorage(bytes);
+    card.decodeFromStorage(bytes);
     assert.equal(card.raceResult.startCode, 3);
     assert.equal(card.raceResult.finishCode, 10);
     assert.equal(card.raceResult.checkCode, 22);
@@ -56,7 +56,7 @@ describe('station codes of start, finish and check', () => {
     setRecord(bytes, 0x14, 20);
     setRecord(bytes, 0x1c, 12);
     const card: Decodable = new SiCard6(0);
-    card._decodeFromStorage(bytes);
+    card.decodeFromStorage(bytes);
     assert.deepEqual(
       [card.raceResult.startCode, card.raceResult.finishCode, card.raceResult.checkCode],
       [13, 20, 12]
@@ -71,7 +71,7 @@ describe('station codes of start, finish and check', () => {
     bytes.splice(0x10, 4, 0x41, 10, 0x0e, 0x10);
     bytes.splice(0x08, 4, 0x41, 22, 0x0e, 0x10);
     const card: Decodable = new SiCard10(0);
-    card._decodeFromStorage(bytes);
+    card.decodeFromStorage(bytes);
     assert.deepEqual(
       [card.raceResult.startCode, card.raceResult.finishCode, card.raceResult.checkCode],
       [259, 266, 278]
@@ -79,7 +79,7 @@ describe('station codes of start, finish and check', () => {
     const six = new Array<number>(0x400).fill(0xee);
     six.splice(0x18, 4, 0x41, 3, 0x0e, 0x10);
     const card6: Decodable = new SiCard6(0);
-    card6._decodeFromStorage(six);
+    card6.decodeFromStorage(six);
     assert.equal(card6.raceResult.startCode, 259);
   });
 
@@ -90,7 +90,7 @@ describe('station codes of start, finish and check', () => {
     bytes.splice(0x10, 4, 0xc1, 3, 0x0e, 0x10);
     bytes[0xa9] = 20;
     const card: Decodable = new SiCard10(0);
-    card._decodeFromStorage(bytes);
+    card.decodeFromStorage(bytes);
     assert.equal(card.raceResult.finishCode, undefined);
   });
 
@@ -105,7 +105,7 @@ describe('station codes of start, finish and check', () => {
       bytes.splice(0x08, 4, ptd, 77, 0x0e, 0x10);
       bytes[0xa1] = 99;
       const card: Decodable = new SiCard10(0);
-      card._decodeFromStorage(bytes);
+      card.decodeFromStorage(bytes);
       assert.equal(card.raceResult.checkCode, code);
     }
   });
@@ -115,13 +115,13 @@ describe('station codes of start, finish and check', () => {
     const bytes = si10.storageData.map((b) => b ?? 0xee);
     bytes.splice(0x0c, 4, 0x00, 0x03, 0xee, 0xee); // start empty, CN left behind
     const card: Decodable = new SiCard10(0);
-    card._decodeFromStorage(bytes);
+    card.decodeFromStorage(bytes);
     assert.equal(card.raceResult.startCode, undefined);
   });
 
   test('SI5 has none', () => {
     const card: Decodable = new SiCard5(0);
-    card._decodeFromStorage(si5.storageData.map((b) => b ?? 0xee));
+    card.decodeFromStorage(si5.storageData.map((b) => b ?? 0xee));
     assert.equal(card.raceResult.startCode, undefined);
     assert.equal(card.raceResult.finishCode, undefined);
     assert.equal(card.raceResult.checkCode, undefined);

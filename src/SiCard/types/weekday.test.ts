@@ -36,7 +36,7 @@ function withWeekdays(): number[] {
 
 function decode(mem: number[]) {
   const card = new SIAC(0);
-  card._decodeFromStorage(mem);
+  card.decodeFromStorage(mem);
   return card.raceResult;
 }
 
@@ -75,7 +75,7 @@ describe('day of week (PTD bits 3-1)', () => {
     const mem = new Array<number>(0x400).fill(0xee);
     mem.splice(0x20, 4, 0x01 | (3 << 1), 0, 0x0e, 0x10);
     const card = new SiCard6(0);
-    card._decodeFromStorage(mem);
+    card.decodeFromStorage(mem);
     assert.equal(card.raceResult.clearWeekdayRaw, 3);
   });
 
@@ -85,14 +85,14 @@ describe('day of week (PTD bits 3-1)', () => {
 
   test('SI5 has none', () => {
     const card = new SiCard5(0);
-    card._decodeFromStorage(si5.storageData as number[]);
+    card.decodeFromStorage(si5.storageData as number[]);
     assert.ok((card.raceResult.punches ?? []).every((p) => p.weekdayRaw === undefined));
     assert.equal(card.raceResult.startWeekdayRaw, undefined);
   });
 
   test('NDJSON: weekday 0-6 or null, weekday_raw 0-7', () => {
     const card = new SIAC(0);
-    card._decodeFromStorage(withWeekdays());
+    card.decodeFromStorage(withWeekdays());
     const lines: string[] = [];
     new NdjsonEmitter({ device_path: 'x', out: (l) => lines.push(l) }).card_read({ card });
     const ev = JSON.parse(lines[0] as string);
@@ -111,7 +111,7 @@ describe('day of week (PTD bits 3-1)', () => {
 
   test('NDJSON: the day of week does not depend on a valid time', () => {
     const card = new SIAC(0);
-    card._decodeFromStorage(withWeekdays());
+    card.decodeFromStorage(withWeekdays());
     // A punch whose time is not valid (eg out of range) still has its day.
     (card.raceResult.punches as { time: number | null }[])[3]!.time = null;
     const lines: string[] = [];
@@ -123,7 +123,7 @@ describe('day of week (PTD bits 3-1)', () => {
 
   test('NDJSON: SI5 punch has weekday null and no weekday_raw', () => {
     const card = new SiCard5(0);
-    card._decodeFromStorage(si5.storageData as number[]);
+    card.decodeFromStorage(si5.storageData as number[]);
     const lines: string[] = [];
     new NdjsonEmitter({ device_path: 'x', out: (l) => lines.push(l) }).card_read({ card });
     const p = JSON.parse(lines[0] as string).punches[0];

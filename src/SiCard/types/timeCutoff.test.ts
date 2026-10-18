@@ -18,7 +18,7 @@ import { fixture as si5 } from '../../../tests/fixtures/upstream/si5-16-punches.
 type Card = SiCard10 | SiCard5 | SiCard6;
 type Punch = { code: number; time: number | null };
 const decode = (card: Card, mem: number[]): Card => {
-  card._decodeFromStorage(mem);
+  card.decodeFromStorage(mem);
   return card;
 };
 const punches = (card: Card): Punch[] => card.raceResult.punches as Punch[];

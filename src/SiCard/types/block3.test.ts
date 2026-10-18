@@ -113,7 +113,7 @@ describe('SIAC block 3: battery and versions', () => {
 
   test('battery date unknown without block 3, and SI10 has none', async () => {
     const siac = new SIAC(0);
-    siac._decodeFromStorage(makeMemory(date(24, 5, 15)).slice(0, BYTES_PER_PAGE));
+    siac.decodeFromStorage(makeMemory(date(24, 5, 15)).slice(0, BYTES_PER_PAGE));
     assert.equal(siac.raceResult.batteryDate, undefined);
     const { card } = await read(SiCard10, makeMemory(date(24, 5, 15)));
     assert.equal(card.raceResult.batteryDate, undefined);

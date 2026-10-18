@@ -96,7 +96,7 @@ describe('SIAC reserve records: first start/finish punch', () => {
     setRecord(mem, FINISH, 0x00, 20, 37_000);
     setRecord(mem, FINISH_R, 0x00, 20, 36_900);
     const card = new SIAC(0);
-    card._decodeFromStorage(mem.slice(0, 3 * BYTES_PER_PAGE)); // blocks 0-2 only
+    card.decodeFromStorage(mem.slice(0, 3 * BYTES_PER_PAGE)); // blocks 0-2 only
     const r = card.raceResult;
     assert.equal(r.finishTime, 37_000);
     for (const k of ['startFirst', 'finishFirst'] as const) {

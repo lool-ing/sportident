@@ -11,7 +11,7 @@ import { withoutWeekday } from './punchesWithoutWeekday.ts';
 
 function decodeSi9(storage: (number | undefined)[]): { [k: string]: unknown } {
   const card = new SiCard9(0);
-  card._decodeFromStorage(storage);
+  card.decodeFromStorage(storage);
   return {
     uid: card.uid,
     cardSeries: card.cardSeries,

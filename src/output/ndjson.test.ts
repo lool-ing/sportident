@@ -97,9 +97,9 @@ describe('NdjsonEmitter', () => {
 
   test('card_read: SI5 from fixture decoder produces snake_case payload with raw punches', () => {
     setMockedClock();
-    // Build an SI5 card from the fixture via the public _decodeFromStorage helper.
+    // Build an SI5 card from the fixture via the public decodeFromStorage helper.
     const card = new SiCard5(si5Fixture.cardData.cardNumber);
-    card._decodeFromStorage(si5Fixture.storageData as number[]);
+    card.decodeFromStorage(si5Fixture.storageData as number[]);
 
     const lines: string[] = [];
     const emitter = new NdjsonEmitter({
@@ -132,7 +132,7 @@ describe('NdjsonEmitter', () => {
     for (let i = 0; i < 36; i++) bytes[getPunchOffset(i)] = 101 + i; // code; time bytes stay 0
     bytes[0x17] = 36 + 1; // SI5 punch count byte: count + 1
     const card = new SiCard5(7050892);
-    card._decodeFromStorage(bytes);
+    card.decodeFromStorage(bytes);
 
     const lines: string[] = [];
     new NdjsonEmitter({ device_path: '/dev/ttyUSB0', out: (line) => lines.push(line) }).card_read({
@@ -156,7 +156,7 @@ describe('NdjsonEmitter', () => {
   test('card_read: SI10 from fixture has uid + start + punch_count=16', () => {
     setMockedClock();
     const card = new SiCard10(si10Fixture.cardData.cardNumber);
-    card._decodeFromStorage(si10Fixture.storageData as number[]);
+    card.decodeFromStorage(si10Fixture.storageData as number[]);
 
     const lines: string[] = [];
     const emitter = new NdjsonEmitter({
@@ -266,7 +266,7 @@ describe('NdjsonEmitter', () => {
   test('NO camelCase keys appear in any emitted line (snake_case)', () => {
     setMockedClock();
     const card = new SiCard10(si10Fixture.cardData.cardNumber);
-    card._decodeFromStorage(si10Fixture.storageData as number[]);
+    card.decodeFromStorage(si10Fixture.storageData as number[]);
 
     const lines: string[] = [];
     const emitter = new NdjsonEmitter({

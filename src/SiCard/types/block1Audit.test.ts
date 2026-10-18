@@ -57,7 +57,7 @@ describe('live read == full-memory decode (block 1 is fetched whenever it matter
         for (const beacon of [0xa5, 0xa9, 0xa1]) mem[beacon] = rnd(2) ? rnd(256) : 0xee;
 
         const full = new Card(0);
-        full._decodeFromStorage(mem);
+        full.decodeFromStorage(mem);
         const live = new Card(0);
         live.mainStation = {
           sendMessage: async (msg: SiMessage) => {

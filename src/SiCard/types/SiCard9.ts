@@ -6,7 +6,7 @@
 //     enforces that SiCard9 NEVER captures SI5_DET messages.
 //   - Stripped lodash; no enums.
 //   - Upstream stdout-warning on storage mismatch removed (decoders are pure).
-//   - Test-only `_decodeFromStorage(bytes)` helper that splices a multi-page
+//   - `decodeFromStorage(bytes)` helper that splices a multi-page
 //     storage blob (pages 0+1 expected for SI9 since max 50 punches in 2 pages).
 //   - Punch control code via siPunchCode(): PTD bits 6-7 are code bits 8-9 (codes > 255).
 //   - Start/finish/check station codes (CN plus PTD bit 6; lost on a start/finish record with PTD bit 7) read into startCode/finishCode/checkCode.
@@ -151,7 +151,7 @@ export class SiCard9 extends ModernSiCard {
       });
   }
 
-  override _decodeFromStorage(storageBytes: (number | undefined)[]): void {
+  override decodeFromStorage(storageBytes: (number | undefined)[]): void {
     const limit = Math.min(storageBytes.length, 0x100);
     for (let i = 0; i < limit; i++) {
       this.storage.splice(i, 1, storageBytes[i] as number);

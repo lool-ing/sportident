@@ -59,7 +59,7 @@ const expectedPunches = [
 describe('SiCard8', () => {
   test('decodes the upstream 16-punch example', () => {
     const card = new SiCard8(0);
-    card._decodeFromStorage([...page0, ...page1]);
+    card.decodeFromStorage([...page0, ...page1]);
     assert.equal(card.raceResult.cardNumber, 2345678);
     assert.equal(card.punchCount, 16);
     assert.equal(card.raceResult.startTime, 8721 + PM);

@@ -7,7 +7,7 @@
 //     if their cardNumber happens to fall in SI5's historical range.
 //   - Stripped lodash; no enums.
 //   - Upstream stdout-warning on storage mismatch removed (decoders are pure).
-//   - Test-only `_decodeFromStorage(bytes)` helper that splices a single-page
+//   - `decodeFromStorage(bytes)` helper that splices a single-page
 //     storage blob and populates raceResult — fixture replay bypasses transport.
 // See NOTICE.md for cumulative attribution.
 
@@ -122,9 +122,9 @@ export class SiCard5 extends BaseSiCard {
       });
   }
 
-  /** Test-only: splice a single 128-byte SI5 page into storage and populate
+  /** Splice a single 128-byte SI5 page into storage and populate
    * raceResult. Bypasses the mainStation. */
-  _decodeFromStorage(storageBytes: (number | undefined)[]): void {
+  decodeFromStorage(storageBytes: (number | undefined)[]): void {
     const limit = Math.min(storageBytes.length, 0x80);
     for (let i = 0; i < limit; i++) {
       this.storage.splice(i, 1, storageBytes[i] as number);

@@ -32,7 +32,7 @@ test('a failed card read and a transport error are reported; the next card is st
   station.emit('error', new Error('card removed during read'));
   transport.emit('error', new Error('EIO'));
   const card = new SiCard9(si9.cardData.cardNumber as number);
-  card._decodeFromStorage(si9.storageData);
+  card.decodeFromStorage(si9.storageData);
   station.emit('cardRead', card);
 
   const events = lines.map((l) => JSON.parse(l) as { event: string; error?: string });

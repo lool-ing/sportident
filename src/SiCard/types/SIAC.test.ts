@@ -23,7 +23,7 @@ import { withoutWeekday } from './punchesWithoutWeekday.ts';
 
 function decodeSiac(storage: (number | undefined)[]): { [k: string]: unknown } {
   const card = new SIAC(0);
-  card._decodeFromStorage(storage);
+  card.decodeFromStorage(storage);
   return {
     uid: card.uid,
     cardSeries: card.cardSeries,
@@ -97,7 +97,7 @@ describe('SIAC decoder — upstream fixture (derived)', () => {
 
   test('5) empty-card fixture decodes to punches: [] without throwing', () => {
     const card = new SiCard10(0);
-    assert.doesNotThrow(() => card._decodeFromStorage(empty.storageData));
+    assert.doesNotThrow(() => card.decodeFromStorage(empty.storageData));
     assert.deepStrictEqual(card.raceResult.punches, []);
     assert.strictEqual(card.punchCount, 0);
   });

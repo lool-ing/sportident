@@ -15,8 +15,8 @@
 //     `raceResultTools.ts` dependency — Phase 0 is a pure decoder; race-result
 //     normalization is Phase 1's job.
 //   - `confirm()` (ACK reply) removed; the readout-side transport handles this.
-//   - Subclasses expose a test-only `_decodeFromStorage(bytes)` helper that
-//     bypasses the mainStation so fixture replay doesn't need a mock station.
+//   - Subclasses implement `decodeFromStorage(bytes)`, which bypasses the
+//     mainStation so fixture replay and `decodeRawPages` need no mock station.
 // See NOTICE.md for cumulative attribution.
 
 import { proto } from '../constants.ts';
@@ -119,11 +119,16 @@ export abstract class BaseSiCard {
   public raceResult: IRaceResultData & { cardNumber: number };
   /** Raw series byte from an SI8_DET frame's params[2]. `undefined` for SI5
    * cards (no series byte) and for cards instantiated directly via
-   * `_decodeFromStorage` in tests. */
+   * `decodeFromStorage` in tests. */
   public cardSeriesByte?: number;
   /** Set by the class the detection command picked, not inferred from the number. */
   abstract readonly cardType: CardType;
   abstract readonly storage: { readonly data: ReadonlyArray<number | undefined> };
+
+  /** Splice raw card bytes (address = index; `undefined` = never read) into
+   * storage and decode them, without a station. Supported API: `decodeRawPages`
+   * and consumers depend on it, so changing what it decodes needs a version bump. */
+  abstract decodeFromStorage(storageBytes: (number | undefined)[]): void;
 
   constructor(cardNumber: number) {
     this.raceResult = { cardNumber };
@@ -135,8 +140,7 @@ export abstract class BaseSiCard {
 
   /** Talks to the (real or fake) main station to read the card off the wire,
    * then populates `this.raceResult`. Pure decoders that don't need transport
-   * should use the subclass-provided `_decodeFromStorage(bytes)` test helper
-   * instead. */
+   * should use `decodeFromStorage(bytes)` instead. */
   read(): Promise<BaseSiCard> {
     return this.typeSpecificRead().then(() => this);
   }

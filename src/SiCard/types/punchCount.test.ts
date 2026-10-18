@@ -15,7 +15,7 @@ import { SIAC } from './SIAC.ts';
 import { getPunchOffset as modernPunchOffset } from './ModernSiCard.ts';
 
 interface Decodable {
-  _decodeFromStorage(bytes: (number | undefined)[]): void;
+  decodeFromStorage(bytes: (number | undefined)[]): void;
   raceResult: { punches?: { code: number; time: number | null }[] };
 }
 
@@ -44,7 +44,7 @@ describe('punches stop at the punch count', () => {
         bytes.splice(offset(i), r.length, ...r);
       }
       const decodable: Decodable = card;
-      decodable._decodeFromStorage(bytes);
+      decodable.decodeFromStorage(bytes);
       assert.deepStrictEqual(
         decodable.raceResult.punches?.map((p) => p.code),
         [31, 32]

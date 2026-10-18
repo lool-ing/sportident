@@ -40,7 +40,7 @@ function image(size: number, records: [number, number, number][]): number[] {
 
 function decode(Card: (typeof CARDS)[number][1], bytes: number[]) {
   const card = new Card(0);
-  card._decodeFromStorage(bytes);
+  card.decodeFromStorage(bytes);
   return card.raceResult;
 }
 
@@ -98,7 +98,7 @@ describe('subsecond in the NDJSON card_read', () => {
     mem[0x16] = 1;
     mem.splice(0x200, 4, 0x81, 31, 0x0e, 0x10);
     const card = new SiCard10(0);
-    card._decodeFromStorage(mem);
+    card.decodeFromStorage(mem);
     emitter.card_read({ card });
     const ev = JSON.parse(lines[0]!);
     assert.equal(ev.start.subsec_256, 64);
@@ -111,7 +111,7 @@ describe('subsecond in the NDJSON card_read', () => {
     const lines: string[] = [];
     const emitter = new NdjsonEmitter({ device_path: '/dev/x', out: (l) => lines.push(l) });
     const card = new SiCard10(0);
-    card._decodeFromStorage(
+    card.decodeFromStorage(
       image(0x400, [
         [0x0c, 0x01, 3],
         [0x10, 0x01, 4],

@@ -9,7 +9,7 @@
 //   - Card holder page (block 1) is not read: upstream marks it untested on
 //     real devices, and readout doesn't need it. One round trip fewer.
 //   - Stripped lodash; no console warnings (decoders are pure).
-//   - Test-only `_decodeFromStorage(bytes)` like the other card types.
+//   - `decodeFromStorage(bytes)` like the other card types.
 //   - Punch control code via siPunchCode(): PTD bits 6-7 are code bits 8-9 (codes > 255).
 //   - Start/finish/check station codes (CN plus PTD bit 6) read into startCode/finishCode/checkCode.
 // See NOTICE.md for cumulative attribution.
@@ -145,8 +145,8 @@ export class SiCard6 extends BaseSiCard {
     this.populateRaceResult();
   }
 
-  /** Test-only: splice storage bytes and populate raceResult, no station. */
-  _decodeFromStorage(storageBytes: (number | undefined)[]): void {
+  /** Splice storage bytes and populate raceResult, no station. */
+  decodeFromStorage(storageBytes: (number | undefined)[]): void {
     const limit = Math.min(storageBytes.length, 0x400);
     for (let i = 0; i < limit; i++) {
       this.storage.splice(i, 1, storageBytes[i] as number);

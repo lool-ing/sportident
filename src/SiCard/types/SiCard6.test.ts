@@ -45,7 +45,7 @@ const PM = 43_200;
 describe('SiCard6', () => {
   test('decodes the upstream 16-punch example', () => {
     const card = new SiCard6(0);
-    card._decodeFromStorage([...block0, ...Array(128 * 5).fill(undefined), ...block6]);
+    card.decodeFromStorage([...block0, ...Array(128 * 5).fill(undefined), ...block6]);
     assert.equal(card.raceResult.cardNumber, 500029);
     assert.equal(card.punchCount, 16);
     assert.equal(card.raceResult.startTime, 38297 + PM);

@@ -38,7 +38,7 @@ function withCode300(storage: readonly (number | undefined)[], offset: number): 
 }
 
 interface Decodable {
-  _decodeFromStorage(bytes: (number | undefined)[]): void;
+  decodeFromStorage(bytes: (number | undefined)[]): void;
   raceResult: { punches?: { code: number; time: number | null; weekdayRaw?: number }[] };
 }
 
@@ -50,7 +50,7 @@ describe('punch control code: PTD bit 6 is code bit 8, bit 7 is not a code bit',
   ] as const) {
     test(`${name}: upstream SI10 fixture with control 300 as its first punch`, () => {
       const card: Decodable = new Card(0);
-      card._decodeFromStorage(withCode300(si10.storageData, modernPunchOffset(0)));
+      card.decodeFromStorage(withCode300(si10.storageData, modernPunchOffset(0)));
       const punches = card.raceResult.punches ?? [];
       assert.deepStrictEqual(withoutWeekday(punches)[0], CODE_300_PUNCH);
       // The other 15 punches have PTD bits 6-7 clear and decode as before.
@@ -68,7 +68,7 @@ describe('punch control code: PTD bit 6 is code bit 8, bit 7 is not a code bit',
   ] as const) {
     test(`${name}: a punch record with PTD 0x41 decodes as control 300`, () => {
       const decodable: Decodable = card;
-      decodable._decodeFromStorage(withCode300(Array<number>(0x400).fill(0xee), offset));
+      decodable.decodeFromStorage(withCode300(Array<number>(0x400).fill(0xee), offset));
       assert.deepStrictEqual(withoutWeekday(decodable.raceResult.punches), [CODE_300_PUNCH]);
     });
   }
@@ -79,7 +79,7 @@ describe('punch control code: PTD bit 6 is code bit 8, bit 7 is not a code bit',
     const card: Decodable = new SiCard10(0);
     const bytes = si10.storageData.map((b) => b ?? 0xee);
     bytes.splice(modernPunchOffset(0), 4, 0x81, 0x2c, 0x0e, 0x10);
-    card._decodeFromStorage(bytes);
+    card.decodeFromStorage(bytes);
     assert.equal(card.raceResult.punches?.[0]?.code, 44);
   });
 });

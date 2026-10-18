@@ -8,7 +8,7 @@
 //     enforces that SiCard8 NEVER captures SI5_DET messages.
 //   - Stripped lodash; no enums.
 //   - Upstream stdout-warning on storage mismatch removed (decoders are pure).
-//   - Test-only `_decodeFromStorage(bytes)` helper that splices pages 0+1.
+//   - `decodeFromStorage(bytes)` helper that splices pages 0+1.
 //   - Registered on 2,000,000–2,999,999 in full. Upstream skips 2,003,000–
 //     2,003,999 because SI6* cards share that range in its single registry;
 //     here SI6 detection (0xE6) has its own registry, so there's no clash.
@@ -151,7 +151,7 @@ export class SiCard8 extends ModernSiCard {
       });
   }
 
-  override _decodeFromStorage(storageBytes: (number | undefined)[]): void {
+  override decodeFromStorage(storageBytes: (number | undefined)[]): void {
     const limit = Math.min(storageBytes.length, 0x100);
     for (let i = 0; i < limit; i++) {
       this.storage.splice(i, 1, storageBytes[i] as number);

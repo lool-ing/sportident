@@ -4,7 +4,7 @@
 // read does, without a station.
 
 import type { BaseSiCard } from './BaseSiCard.ts';
-import { RAW_BLOCK_SIZE, type RawPages } from './rawPages.ts';
+import { RAW_BLOCK_SIZE, RAW_LAYOUTS, type RawPages } from './rawPages.ts';
 import { SiCard5 } from './types/SiCard5.ts';
 import { SiCard6 } from './types/SiCard6.ts';
 import { SiCard8 } from './types/SiCard8.ts';
@@ -28,6 +28,9 @@ const CARD_CLASSES: Record<string, new (cardNumber: number) => BaseSiCard> = {
 export const decodeRawPages = (raw: RawPages): BaseSiCard => {
   const Card = Object.hasOwn(CARD_CLASSES, raw.cardType) ? CARD_CLASSES[raw.cardType] : undefined;
   if (!Card) throw new Error(`decodeRawPages: unknown card type ${String(raw.cardType)}`);
+  if (raw.layout !== RAW_LAYOUTS[raw.cardType as keyof typeof RAW_LAYOUTS].layout) {
+    throw new Error(`decodeRawPages: layout ${String(raw.layout)} does not match ${raw.cardType}`);
+  }
   const card = new Card(0);
   const blockCount = card.storage.data.length / RAW_BLOCK_SIZE;
   const bytes: (number | undefined)[] = [];
@@ -47,8 +50,9 @@ export const decodeRawPages = (raw: RawPages): BaseSiCard => {
     bytes.length = Math.max(bytes.length, (block + 1) * RAW_BLOCK_SIZE);
     bytes.splice(block * RAW_BLOCK_SIZE, RAW_BLOCK_SIZE, ...b);
   }
-  (card as unknown as { _decodeFromStorage(b: (number | undefined)[]): void })._decodeFromStorage(
-    bytes
-  );
+  if (!seen.has(0)) {
+    throw new Error('decodeRawPages: block 0 holds the card number and must be listed');
+  }
+  card.decodeFromStorage(bytes);
   return card;
 };

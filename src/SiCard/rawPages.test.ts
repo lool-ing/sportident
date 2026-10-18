@@ -166,7 +166,7 @@ describe('rawPages snapshot equals the bench transcripts', () => {
 
 type Ctor = new (
   n: number
-) => BaseSiCard & { _decodeFromStorage: (b: (number | undefined)[]) => void };
+) => BaseSiCard & { decodeFromStorage: (b: (number | undefined)[]) => void };
 const CLASSES: Record<string, Ctor> = {
   SI5: SiCard5,
   SI6: SiCard6,
@@ -186,7 +186,7 @@ const toImage = (raw: RawPages): (number | undefined)[] => {
 /** Everything a consumer takes from a card except the holder text and the UID. */
 const race = (type: string, image: (number | undefined)[]): unknown => {
   const card = new CLASSES[type]!(0);
-  card._decodeFromStorage(image.slice());
+  card.decodeFromStorage(image.slice());
   const result: Record<string, unknown> = { ...card.raceResult };
   delete result.cardHolder;
   return { result, punchCount: (card as { punchCount?: number }).punchCount };
@@ -324,6 +324,14 @@ describe('decodeRawPages', () => {
       assert.strictEqual(decoded.cardType, type);
       assert.deepStrictEqual(decoded.raceResult, card.raceResult);
       assert.strictEqual(decoded.raceResult.punches?.length, card.raceResult.punches?.length);
+      // Fields the decoders set on the card itself, outside raceResult.
+      for (const key of ['punchCount', 'uid', 'cardSeries', 'softwareVersion'] as const) {
+        assert.strictEqual(
+          (decoded as unknown as Record<string, unknown>)[key],
+          (card as unknown as Record<string, unknown>)[key],
+          key
+        );
+      }
     });
   }
 
@@ -350,6 +358,31 @@ describe('decodeRawPages', () => {
       () => decodeRawPages({ cardType: 'SIAC', layout: 'modern', blocks: [block(8)] }),
       /block 8 is not a single block 0-7 of SIAC/
     );
+  });
+
+  test('rejects a layout that does not belong to the card type', () => {
+    const blocks = [{ block: 0, bytes: new Uint8Array(RAW_BLOCK_SIZE) }];
+    assert.throws(
+      () => decodeRawPages({ cardType: 'SI8', layout: 'si5', blocks }),
+      /layout si5 does not match SI8/
+    );
+  });
+
+  test('rejects a snapshot without block 0 (the card number)', () => {
+    const blocks = [{ block: 1, bytes: new Uint8Array(RAW_BLOCK_SIZE) }];
+    assert.throws(
+      () => decodeRawPages({ cardType: 'SI8', layout: 'si8', blocks }),
+      /block 0 .*card number/
+    );
+    assert.throws(
+      () => decodeRawPages({ cardType: 'SI5', layout: 'si5', blocks: [] }),
+      /block 0 .*card number/
+    );
+  });
+
+  test('decodeFromStorage is a typed method on BaseSiCard', () => {
+    const card: BaseSiCard = new SiCard5(0);
+    card.decodeFromStorage(new Array<number>(0x80).fill(0xee));
   });
 
   test('rejects a block that is not 128 bytes', () => {

@@ -11,7 +11,7 @@
 //   - typeSpecificRead chain explicitly issues `GET_SI8` with `parameters: [0x04]` for
 //     the first punch page when the card has any punches — enforces
 //     that punches live on pages 4-7, not page 0.
-//   - Added a test-only `_decodeFromStorage(bytes)` helper that splices a complete
+//   - Added a `decodeFromStorage(bytes)` helper that splices a complete
 //     storage buffer (page0..page7 concatenated, or partial) into the SiStorage and
 //     resolves the raceResult; fixture replay tests use this instead of a mock
 //     station.
@@ -385,10 +385,10 @@ export abstract class ModernSiCard extends BaseSiCard {
       });
   }
 
-  /** Test-only: splice raw storage bytes (page 0..page 7 concatenated, or any
+  /** Splice raw storage bytes (page 0..page 7 concatenated, or any
    * prefix) into the SiStorage buffer and populate the raceResult. Bypasses
    * the mainStation so fixture replay doesn't need a mock transport. */
-  _decodeFromStorage(storageBytes: (number | undefined)[]): void {
+  decodeFromStorage(storageBytes: (number | undefined)[]): void {
     // Splice in chunks so an undefined-tail (e.g. tests that only ship page 0)
     // doesn't blow size limits.
     const limit = Math.min(storageBytes.length, 0x400);
