@@ -124,6 +124,19 @@ describe('--baud parsing', () => {
     assert.throws(() => parseBaud('9600'), /--baud must be 38400, 4800 or auto \(got: 9600\)/);
   });
 
+  test('a bad LOOL_BAUD does not block an explicit --baud (it is read after the arguments)', () => {
+    const before = process.env.LOOL_BAUD;
+    process.env.LOOL_BAUD = '9600';
+    try {
+      assert.strictEqual(parseArgs(['--baud', '4800']).baud, 4800);
+      assert.strictEqual(parseTrainerArgs(['--baud', '4800']).baud, 4800);
+      assert.throws(() => parseArgs([]), /must be 38400, 4800 or auto \(got: 9600\)/);
+    } finally {
+      if (before === undefined) delete process.env.LOOL_BAUD;
+      else process.env.LOOL_BAUD = before;
+    }
+  });
+
   test('lool-readout and lool-trainer take --baud, default 38400', () => {
     assert.strictEqual(parseArgs([]).baud, 38400);
     assert.strictEqual(parseArgs(['--baud', '4800']).baud, 4800);

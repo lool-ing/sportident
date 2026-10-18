@@ -96,7 +96,7 @@ Exit codes:
 export const parseArgs = (argv: string[]): CliOpts => {
   const opts: CliOpts = {
     device: process.env.LOOL_DEVICE ?? '/dev/ttyUSB0',
-    baud: parseBaud(process.env.LOOL_BAUD ?? '38400'),
+    baud: 38400,
     once: false,
     includeRawPages: false,
     pretty: false,
@@ -120,6 +120,8 @@ export const parseArgs = (argv: string[]): CliOpts => {
     return { value: next, consumed: 1 };
   };
 
+  // Parsed after the loop: --help still works and --baud overrides a bad $LOOL_BAUD.
+  let baudArg: string | undefined;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i] as string;
     if (a === '--device' || a.startsWith('--device=')) {
@@ -128,7 +130,7 @@ export const parseArgs = (argv: string[]): CliOpts => {
       i += consumed;
     } else if (a === '--baud' || a.startsWith('--baud=')) {
       const { value, consumed } = valueFor('--baud', a, i);
-      opts.baud = parseBaud(value);
+      baudArg = value;
       i += consumed;
     } else if (a === '--once') {
       opts.once = true;
@@ -151,6 +153,7 @@ export const parseArgs = (argv: string[]): CliOpts => {
       throw new Error(`Unknown argument: ${a}`);
     }
   }
+  opts.baud = parseBaud(baudArg ?? process.env.LOOL_BAUD ?? '38400');
   return opts;
 };
 

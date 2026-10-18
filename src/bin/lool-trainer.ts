@@ -70,7 +70,7 @@ fine. Missing a code, or punching them out of order, is MP.
 export const parseTrainerArgs = (argv: string[]): TrainerOpts => {
   const opts: TrainerOpts = {
     device: process.env.LOOL_DEVICE ?? '/dev/ttyUSB0',
-    baud: parseBaud(process.env.LOOL_BAUD ?? '38400'),
+    baud: 38400,
     course: [...DEFAULT_COURSE],
     bell: false,
     requireStart: false,
@@ -91,6 +91,8 @@ export const parseTrainerArgs = (argv: string[]): TrainerOpts => {
     return { value: next, consumed: 1 };
   };
 
+  // Parsed after the loop: --help still works and --baud overrides a bad $LOOL_BAUD.
+  let baudArg: string | undefined;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i] as string;
     if (a === '--device' || a.startsWith('--device=')) {
@@ -99,7 +101,7 @@ export const parseTrainerArgs = (argv: string[]): TrainerOpts => {
       i += consumed;
     } else if (a === '--baud' || a.startsWith('--baud=')) {
       const { value, consumed } = valueFor('--baud', a, i);
-      opts.baud = parseBaud(value);
+      baudArg = value;
       i += consumed;
     } else if (a === '--course' || a.startsWith('--course=')) {
       const { value, consumed } = valueFor('--course', a, i);
@@ -122,6 +124,7 @@ export const parseTrainerArgs = (argv: string[]): TrainerOpts => {
       throw new Error(`Unknown argument: ${a}`);
     }
   }
+  opts.baud = parseBaud(baudArg ?? process.env.LOOL_BAUD ?? '38400');
   return opts;
 };
 
