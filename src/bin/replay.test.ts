@@ -223,6 +223,17 @@ describe('replayFixture — deterministic playback through directional transcrip
     assert.ok(result.diff && result.diff.length > 0, 'diff should be non-empty');
   });
 
+  test('a request the transcript expects but the reader never sends -> matches=false', async () => {
+    const basename = newBasename('unsent-out');
+    await captureFixture(basename);
+    // An extra trailing ACK the reader will not send; expected.json unchanged.
+    fs.appendFileSync(`${basename}.bytes.hex`, 'out 06\n');
+
+    const result = await replayFixture(basename, { allowedRoots: [cwd, TMP] });
+    assert.strictEqual(result.matches, false);
+    assert.match(result.diff ?? '', /out never sent: transcript expects '06'/);
+  });
+
   test('corrupted transcript (out order changed) -> matches=false', async () => {
     const basename = newBasename('corrupt-transcript');
     await captureFixture(basename);
