@@ -72,7 +72,8 @@ export interface HalfDayClock {
 
 export interface NdjsonPunch {
   code: number;
-  /** null (with `half_day`): the card stores a code but no time (SI5 slots 31-36). */
+  /** null (with `half_day`): the punch has a code but no valid time, eg SI5
+   * slots 31-36 (code only) or a stored time out of range. */
   seconds_in_half_day: number | null;
   half_day: 0 | 1 | null;
   weekday: number | null;

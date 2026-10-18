@@ -70,7 +70,7 @@ const formatCardRead = (e: Extract<NdjsonEvent, { event: 'card_read' }>): string
         (v.count > 1 ? `  (${v.count}×)` : '')
       ).trimEnd()
     );
-    prev = v.time;
+    if (v.time !== null) prev = v.time; // splits count from the last timed punch
   });
   lines.push(
     '',

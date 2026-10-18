@@ -77,4 +77,23 @@ describe('formatEvent card_read', () => {
     );
     assert.match(text, /total 20:00$/m);
   });
+
+  test('a punch without time: the next split and the finish split still count from the last timed punch', () => {
+    const text = formatEvent(
+      cardRead({
+        card_type: 'SI5',
+        start: { seconds_in_half_day: 36000, half_day: 0, weekday: null },
+        finish: { seconds_in_half_day: 37200, half_day: 0, weekday: null },
+        punch_count: 3,
+        punches: [
+          punch(31, 36300),
+          { code: 32, seconds_in_half_day: null, half_day: null, weekday: null },
+          punch(33, 36900),
+        ],
+      })
+    );
+    assert.match(text, /^ +2 +32 +—/m);
+    assert.match(text, /^ +3 +33 +10:15:00 +10:00 +15:00$/m);
+    assert.match(text, /Finish {3}10:20:00 {2}split 5:00 {2}total 20:00/);
+  });
 });
