@@ -28,6 +28,7 @@ interface NodeSerialPortLike extends EventEmitter {
   write(buf: Buffer, cb: (err: Error | null) => void): boolean;
   drain(cb: (err: Error | null) => void): void;
   close(cb: (err: Error | null) => void): void;
+  update(opts: { baudRate: number }, cb: (err: Error | null) => void): void;
 }
 
 interface NodeSerialPortCtor {
@@ -113,6 +114,13 @@ export class SerialTransport extends EventEmitter implements ISerialTransport {
         if (err) reject(err);
         else resolve();
       });
+    });
+  }
+
+  /** Changes the rate of the open port (`--baud auto` retries at 4800). */
+  setBaudRate(baudRate: number): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      this.port.update({ baudRate }, (err) => (err ? reject(err) : resolve()));
     });
   }
 

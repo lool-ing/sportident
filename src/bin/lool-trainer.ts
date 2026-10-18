@@ -18,6 +18,7 @@
 // stdout stays NDJSON so the trainer can still be piped into downstream
 // tooling (live results UI, IOF XML exporter, etc.) when Phase 1 lands.
 
+import { initialBaud, parseBaud, readCardsAtBaud, type Baud } from './baud.ts';
 import { SerialTransport } from '../transport/SerialTransport.ts';
 import { SiMainStation } from '../SiStation/SiMainStation.ts';
 import { NdjsonEmitter } from '../output/ndjson.ts';
@@ -30,6 +31,7 @@ import { realpathSync } from 'node:fs';
 
 export interface TrainerOpts {
   device: string;
+  baud: Baud;
   course: number[];
   bell: boolean;
   requireStart: boolean;
@@ -45,6 +47,8 @@ Usage:
 
 Options:
   --device <path>          Serial device (overrides $LOOL_DEVICE, default /dev/ttyUSB0)
+  --baud <38400|4800|auto> Serial rate (overrides $LOOL_BAUD, default 38400). Some
+                           stations only answer at 4800; auto tries 38400, then 4800
   --course <codes>         Comma-separated control codes in order (default: ${DEFAULT_COURSE.join(',')})
   --bell                   Ring the terminal bell on MP (helpful when running blind)
   --require-start          Require a start punch on the card (open classes / kids).
@@ -66,6 +70,7 @@ fine. Missing a code, or punching them out of order, is MP.
 export const parseTrainerArgs = (argv: string[]): TrainerOpts => {
   const opts: TrainerOpts = {
     device: process.env.LOOL_DEVICE ?? '/dev/ttyUSB0',
+    baud: parseBaud(process.env.LOOL_BAUD ?? '38400'),
     course: [...DEFAULT_COURSE],
     bell: false,
     requireStart: false,
@@ -91,6 +96,10 @@ export const parseTrainerArgs = (argv: string[]): TrainerOpts => {
     if (a === '--device' || a.startsWith('--device=')) {
       const { value, consumed } = valueFor('--device', a, i);
       opts.device = value;
+      i += consumed;
+    } else if (a === '--baud' || a.startsWith('--baud=')) {
+      const { value, consumed } = valueFor('--baud', a, i);
+      opts.baud = parseBaud(value);
       i += consumed;
     } else if (a === '--course' || a.startsWith('--course=')) {
       const { value, consumed } = valueFor('--course', a, i);
@@ -217,7 +226,7 @@ const main = async (): Promise<void> => {
   const emitter = new NdjsonEmitter({ device_path: opts.device });
   emitter.connection_changed({ state: 'opening' });
 
-  const transport = new SerialTransport({ path: opts.device, baudRate: 38400 });
+  const transport = new SerialTransport({ path: opts.device, baudRate: initialBaud(opts.baud) });
   const station = new SiMainStation(transport);
 
   const courseStr = opts.course.join(' → ');
@@ -265,7 +274,13 @@ const main = async (): Promise<void> => {
 
   await transport.open();
   emitter.connection_changed({ state: 'open' });
-  await station.readCards();
+  const baud = await readCardsAtBaud({
+    transport,
+    readCards: () => station.readCards(),
+    path: opts.device,
+    baud: opts.baud,
+  });
+  if (opts.baud === 'auto') emitDiagnostic(`station answered at ${baud} baud`);
 
   // Wire SIGINT to clean shutdown — closes the station + transport so the
   // BSM7 stops emitting before we exit, and the next session opens cleanly.

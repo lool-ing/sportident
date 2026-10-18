@@ -34,12 +34,14 @@ import { formatEvent } from '../output/pretty.ts';
 import type { FrameError } from '../siProtocol.ts';
 import type { BaseSiCard } from '../SiCard/BaseSiCard.ts';
 import { inferCardType } from '../SiCard/cardTypeFromNumber.ts';
+import { initialBaud, parseBaud, readCardsAtBaud, type Baud } from './baud.ts';
 import { RecordSink } from './record.ts';
 import { replayFixture } from './replay.ts';
 
 // ---------------------------------------------------------------------------
 // CLI arg parsing — minimal hand-rolled (no commander/yargs dep). Flags:
 //   --device <path>          Serial device (overrides $LOOL_DEVICE)
+//   --baud <38400|4800|auto> Serial rate (overrides $LOOL_BAUD, default 38400)
 //   --once                   Read one card then exit
 //   --include-raw-pages      Include raw_pages_b64 in card_read events
 //   --pretty                 Human-readable punch table instead of NDJSON
@@ -51,6 +53,7 @@ import { replayFixture } from './replay.ts';
 
 export interface CliOpts {
   device: string;
+  baud: Baud;
   once: boolean;
   includeRawPages: boolean;
   pretty: boolean;
@@ -65,6 +68,8 @@ Usage:
 
 Options:
   --device <path>          Serial device (overrides $LOOL_DEVICE, default /dev/ttyUSB0)
+  --baud <38400|4800|auto> Serial rate (overrides $LOOL_BAUD, default 38400). Some
+                           stations only answer at 4800; auto tries 38400, then 4800
   --once                   Read a single card then exit cleanly
   --include-raw-pages      Include raw_pages_b64 in card_read events
   --pretty                 Print a human-readable punch table instead of NDJSON
@@ -91,6 +96,7 @@ Exit codes:
 export const parseArgs = (argv: string[]): CliOpts => {
   const opts: CliOpts = {
     device: process.env.LOOL_DEVICE ?? '/dev/ttyUSB0',
+    baud: parseBaud(process.env.LOOL_BAUD ?? '38400'),
     once: false,
     includeRawPages: false,
     pretty: false,
@@ -119,6 +125,10 @@ export const parseArgs = (argv: string[]): CliOpts => {
     if (a === '--device' || a.startsWith('--device=')) {
       const { value, consumed } = valueFor('--device', a, i);
       opts.device = value;
+      i += consumed;
+    } else if (a === '--baud' || a.startsWith('--baud=')) {
+      const { value, consumed } = valueFor('--baud', a, i);
+      opts.baud = parseBaud(value);
       i += consumed;
     } else if (a === '--once') {
       opts.once = true;
@@ -270,7 +280,7 @@ const main = async (): Promise<void> => {
 
   emitter.connection_changed({ state: 'opening' });
 
-  const transport = new SerialTransport({ path: opts.device, baudRate: 38400 });
+  const transport = new SerialTransport({ path: opts.device, baudRate: initialBaud(opts.baud) });
 
   // When recording, intercept BOTH transport pathways via a thin Proxy so the
   // sink sees every wire chunk in both directions. The proxy wraps `send`
@@ -330,7 +340,13 @@ const main = async (): Promise<void> => {
   }
 
   await transport.open();
-  await station.readCards();
+  const baud = await readCardsAtBaud({
+    transport,
+    readCards: () => station.readCards(),
+    path: opts.device,
+    baud: opts.baud,
+  });
+  if (opts.baud === 'auto') emitDiagnostic(`station answered at ${baud} baud`);
   // Stay alive listening for cards until SIGINT or --once mode triggers exit
   // via cardRead handler.
 };

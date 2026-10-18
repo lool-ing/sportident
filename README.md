@@ -61,10 +61,13 @@ Other entry points, all exported from the package root:
 
 - `lool-readout` prints every card read as NDJSON on stdout.
   `--device <path>` (or `LOOL_DEVICE`, default `/dev/ttyUSB0`),
+  `--baud <38400|4800|auto>` (or `LOOL_BAUD`, default `38400`; some
+  stations only answer at 4800, `auto` tries 38400 then 4800),
   `--pretty`, `--once`. `--record <name>` saves a wire transcript and
   `--replay <name>` checks the decoder against one.
 - `lool-trainer --course 31,32,33` checks each card against a course,
-  for training without a competition system.
+  for training without a competition system. Takes `--device` and
+  `--baud` too.
 
 Both print `--help`.
 

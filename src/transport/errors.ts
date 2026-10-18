@@ -10,11 +10,13 @@ export class DeviceClosedError extends Error {
 }
 
 export class SendTimeoutError extends Error {
+  readonly command: number;
   constructor(command: number, timeoutMs: number) {
     super(
       `Send timed out after ${timeoutMs}ms (command 0x${command.toString(16).padStart(2, '0').toUpperCase()})`
     );
     this.name = 'SendTimeoutError';
+    this.command = command;
   }
 }
 
