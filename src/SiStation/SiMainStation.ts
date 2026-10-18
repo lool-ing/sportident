@@ -52,6 +52,18 @@ import '../SiCard/types/SIAC.ts';
  * siac-bench-001, 2026-10-18): each waits for its reply 2.5 s, 2.5 s, 2 s, and
  * a NAK is tried again 500 ms after it. */
 const CARD_TRY_TIMEOUTS_MS = [2_500, 2_500, 2_000];
+
+/** GET_SI8 / GET_SI6: the reply echoes the page or block asked for. */
+const isPagedRead = (m: SiMessage): m is SiMessage & { command: number; parameters: number[] } =>
+  m.mode === undefined && (m.command === proto.cmd.GET_SI8 || m.command === proto.cmd.GET_SI6);
+
+/** A paged reply for another page than the one asked for. */
+class StaleReplyError extends Error {
+  constructor(asked: number, got: number | undefined) {
+    super(`reply for page ${got} (asked for ${asked})`);
+    this.name = 'StaleReplyError';
+  }
+}
 const NAK_RETRY_MS = 500;
 
 export class SiMainStation extends EventEmitter implements ISiMainStation {
@@ -286,13 +298,22 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
   ): Promise<number[][]> {
     if (this.readingCard !== card) throw new Error('card removed during read');
     try {
-      return await this.multiplexer.sendMessage(
+      const frames = await this.multiplexer.sendMessage(
         message,
         expectedResponses,
         timeoutMs ?? CARD_TRY_TIMEOUTS_MS[attempt]
       );
+      // A late reply to an earlier, timed-out try pairs with this request but
+      // carries another page/block ([cmd, len, cn1, cn0, page, ...]): ask again.
+      if (isPagedRead(message) && frames[0]?.[4] !== message.parameters[0]) {
+        throw new StaleReplyError(message.parameters[0]!, frames[0]?.[4]);
+      }
+      return frames;
     } catch (err) {
-      const again = err instanceof NakError || err instanceof SendTimeoutError;
+      const again =
+        err instanceof NakError ||
+        err instanceof SendTimeoutError ||
+        err instanceof StaleReplyError;
       if (!again || attempt + 1 >= CARD_TRY_TIMEOUTS_MS.length || this.readingCard !== card) {
         throw err;
       }

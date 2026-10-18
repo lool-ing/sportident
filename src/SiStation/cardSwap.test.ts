@@ -424,6 +424,28 @@ describe('SiMainStation: timeout retry', () => {
     assert.ok(gaps(r, 'GET p4 A')[0]! >= 2490, `retry after ${gaps(r, 'GET p4 A')}`);
   });
 
+  test('a late reply to the timed-out try lands on the next page request: that page is asked again', async () => {
+    const r = await run(
+      {
+        // Page 0's first reply comes after its 2.5 s try timed out, while the
+        // page-4 request (answered 50 ms late) is pending.
+        'A:0': (fake) => {
+          setTimeout(() => fake.inject(page(A.storageData as number[], 0)), 2520);
+          return { extra: [], next: 'A', drop: true };
+        },
+        'A:4': (fake) => {
+          setTimeout(() => fake.inject(page(A.storageData as number[], 4)), 50);
+          return { extra: [], next: 'A', drop: true };
+        },
+      },
+      {},
+      2900
+    );
+    assert.deepEqual(r.read, [a]);
+    assert.deepEqual(r.errors, []);
+    assert.deepEqual(r.log, ['GET p0 A', 'GET p0 A', 'GET p4 A', 'GET p4 A', 'ACK']);
+  });
+
   test('no reply ever: three tries 2.5 s, 2.5 s and 2 s, then the read fails without an ACK', async () => {
     const r = await run({}, {}, 7300, { 'A:4': 3 });
     assert.deepEqual(r.read, []);
