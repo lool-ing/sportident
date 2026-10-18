@@ -17,3 +17,11 @@ export class SendTimeoutError extends Error {
     this.name = 'SendTimeoutError';
   }
 }
+
+/** The station refused the command with a bare NAK (eg no card to read). */
+export class NakError extends Error {
+  constructor() {
+    super('NAK');
+    this.name = 'NakError';
+  }
+}

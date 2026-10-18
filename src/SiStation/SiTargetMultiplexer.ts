@@ -25,7 +25,7 @@ import { proto } from '../constants.ts';
 import { parseAll, render, type FrameError, type SiMessage } from '../siProtocol.ts';
 import { EventEmitter } from '../utils/events.ts';
 import type { ISerialTransport } from '../transport/ISerialTransport.ts';
-import { DeviceClosedError } from '../transport/errors.ts';
+import { DeviceClosedError, NakError } from '../transport/errors.ts';
 import { SiSendTask } from './SiSendTask.ts';
 
 const RECEIVE_BUFFER_CAP_BYTES = 64 * 1024;
@@ -193,7 +193,7 @@ export class SiTargetMultiplexer extends EventEmitter {
     // (ACK/WAKEUP) are dropped.
     if (message.mode !== undefined) {
       if (message.mode === proto.NAK && head) {
-        head.failWithError(new Error('NAK'));
+        head.failWithError(new NakError());
         this._removeTask(head);
       }
       return;

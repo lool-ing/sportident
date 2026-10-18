@@ -13,7 +13,7 @@
 // --- Transport ---------------------------------------------------------------
 export { SerialTransport } from './transport/SerialTransport.ts';
 export type { ISerialTransport } from './transport/ISerialTransport.ts';
-export { DeviceClosedError, SendTimeoutError } from './transport/errors.ts';
+export { DeviceClosedError, NakError, SendTimeoutError } from './transport/errors.ts';
 
 // --- Station ----------------------------------------------------------------
 export { SiMainStation } from './SiStation/SiMainStation.ts';
