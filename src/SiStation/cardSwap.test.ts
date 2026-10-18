@@ -70,7 +70,7 @@ class FakeStation extends EventEmitter implements ISerialTransport {
       this.note('ACK');
       return;
     }
-    if (bytes[2] !== proto.cmd.GET_SI8) return;
+    if (bytes[2] !== proto.cmd.GET_SI8) return this.inject([proto.NAK]); // eg readCards' SET_MS
     const p = bytes[4]!;
     const card = this.onStation;
     this.note(`GET p${p} ${card ?? '-'}`);
@@ -250,5 +250,55 @@ describe('SiMainStation: the same card detected again before removal', () => {
       'error NAK',
       ...READ_A,
     ]);
+  });
+});
+
+describe('SiMainStation: the same card detected again during its read', () => {
+  const DET_A = det(a, 0x0f);
+  /** Hold page 4's reply 60 ms; `during` sends extra detects meanwhile. */
+  const holdPage4 =
+    (during: (fake: FakeStation) => void): Hook =>
+    (fake) => {
+      during(fake);
+      setTimeout(() => fake.inject(page(A.storageData as number[], 4)), 60);
+      return { extra: [], next: 'A', drop: true };
+    };
+  const assertOneRead = (r: Awaited<ReturnType<typeof run>>): void => {
+    assert.deepEqual(r.read, [a]);
+    assert.deepEqual(r.errors, []);
+    assert.deepEqual(r.log, ['GET p0 A', 'GET p4 A', 'ACK']);
+  };
+
+  test('while page 4 is pending: ignored, the read goes on, one ACK', async () => {
+    assertOneRead(await run({ 'A:4': holdPage4((fake) => fake.inject(DET_A)) }));
+  });
+
+  test('in the same chunk as the page-0 reply: ignored', async () => {
+    assertOneRead(await run({ 'A:0': () => ({ extra: DET_A, next: 'A' }) }));
+  });
+
+  test('three times during the read: ignored', async () => {
+    assertOneRead(
+      await run({
+        'A:4': holdPage4((fake) => {
+          for (const ms of [10, 20, 30]) setTimeout(() => fake.inject(DET_A), ms);
+        }),
+      })
+    );
+  });
+
+  test('a new session (readCards) reads the card again', async () => {
+    const fake = new FakeStation();
+    const station = new SiMainStation(fake);
+    const read: number[] = [];
+    station.on('cardRead', (c: BaseSiCard) => read.push(c.cardNumber));
+    fake.inject(DET_A);
+    await new Promise((r) => setTimeout(r, 50));
+    // The fake NAKs the handshake: only that a new session started matters.
+    await assert.rejects(station.readCards());
+    fake.inject(DET_A);
+    await new Promise((r) => setTimeout(r, 50));
+    await station.close();
+    assert.deepEqual(read, [a, a]);
   });
 });

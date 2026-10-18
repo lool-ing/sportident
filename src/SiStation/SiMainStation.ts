@@ -59,9 +59,11 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
   private isClosed = false;
   /** The card whose read is in flight, if any. */
   private readingCard: BaseSiCard | undefined;
-  /** The card last read and ACKed, until SI_REM or another card: a new detect
-   * of it only gets an ACK, no read and no events (the station sends one when
-   * the card is put back without being taken away). */
+  /** One successful read per insertion within the same connected session;
+   * after a process restart or reconnect (readCards) the card may be read
+   * again. So a new detect of the card last read and ACKed only gets an ACK,
+   * no read and no events, until SI_REM or another card; one of the card
+   * being read is ignored. */
   private ackedCardNumber: number | undefined;
   /** Ends the wait before a NAK retry at once (the card left). */
   private cancelNakWait: (() => void) | undefined;
@@ -113,6 +115,7 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
    * see them via the multiplexer's 'message' event path.
    */
   async readCards(): Promise<void> {
+    this.ackedCardNumber = undefined;
     this._emitState('opening');
     try {
       // Step 1: SET_MS(0x4D) — Master mode handshake.
@@ -214,6 +217,8 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
         this.multiplexer.sendBareAck().catch((err: Error) => this.emit('error', err));
         return;
       }
+      // Restarting would only lose the replies already on their way.
+      if (card && card.cardNumber === this.readingCard?.cardNumber) return;
       this.ackedCardNumber = undefined;
       this._abortRead();
       if (!card) return;

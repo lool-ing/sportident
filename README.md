@@ -41,6 +41,12 @@ await station.readCards();
 // later: await station.close();
 ```
 
+`cardRead` fires once per insertion: one successful read per insertion
+within the same connected session. The station may report the same card
+again without a removal; that only gets an ACK until the card is taken
+away. After a process restart or reconnect (`readCards()`) the card may be
+read again. A failed read is retried on the next insertion report.
+
 Other entry points, all exported from the package root:
 
 - `AutosendListener` emits a `punch` for each autosend record on a
