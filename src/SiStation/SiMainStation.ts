@@ -239,13 +239,16 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
       // (cardInserted -> [card data on wire] -> [ACK on wire] -> cardRead).
       card
         .read()
-        .then(() => {
+        .then(async () => {
           // All pages came before the card left: report it, but no ACK, since
           // the station may already hold the next card.
           if (this.readingCard !== card) return;
+          // Still reading until the ACK is out: a failed write leaves no lock,
+          // so the next detect reads the card again.
+          await this.multiplexer.sendBareAck();
+          if (this.readingCard !== card) return;
           this.readingCard = undefined;
           this.ackedCardNumber = card.cardNumber;
-          return this.multiplexer.sendBareAck();
         })
         .then(() => this.emit('cardRead', card))
         .catch((err: Error) => {

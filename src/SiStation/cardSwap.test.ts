@@ -58,7 +58,14 @@ class FakeStation extends EventEmitter implements ISerialTransport {
   close(): Promise<void> {
     return Promise.resolve();
   }
+  /** ACK writes left that fail (a serial write error). */
+  failAcks = 0;
   send(bytes: number[]): Promise<void> {
+    if (bytes.length === 1 && bytes[0] === proto.ACK && this.failAcks > 0) {
+      this.failAcks--;
+      this.note('ACK write failed');
+      return Promise.reject(new Error('write failed'));
+    }
     this.answer(bytes);
     return Promise.resolve();
   }
@@ -195,9 +202,11 @@ describe('SiMainStation: the same card detected again before removal', () => {
    * optionally a card change), recording station events in the fake's log. */
   const script = async (
     steps: { ms: number; bytes: number[]; card?: Card }[],
-    naks: Record<string, number> = {}
+    naks: Record<string, number> = {},
+    failAcks = 0
   ): Promise<string[]> => {
     const fake = new FakeStation({}, naks);
+    fake.failAcks = failAcks;
     const station = new SiMainStation(fake);
     station.on('cardInserted', (c: BaseSiCard) => fake.log.push(`inserted ${c.cardNumber}`));
     station.on('cardRead', (c: BaseSiCard) => fake.log.push(`read ${c.cardNumber}`));
@@ -223,6 +232,25 @@ describe('SiMainStation: the same card detected again before removal', () => {
       { ms: 100, bytes: DET_A, card: 'A' },
     ]);
     assert.deepEqual(log, [...READ_A, 'ACK', ...READ_A]);
+  });
+
+  test('a failed ACK write: no report, and the next detect reads the card again', async () => {
+    const log = await script(
+      [
+        { ms: 0, bytes: DET_A },
+        { ms: 100, bytes: DET_A },
+      ],
+      {},
+      1
+    );
+    assert.deepEqual(log, [
+      'inserted ' + a,
+      'GET p0 A',
+      'GET p4 A',
+      'ACK write failed',
+      'error write failed',
+      ...READ_A,
+    ]);
   });
 
   test('another card detected without SI_REM is read', async () => {
