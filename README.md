@@ -76,18 +76,19 @@ The library does not sanitise. `RAW_LAYOUTS[cardType].personal` lists the
 card addresses (`block * 128 + offset`, both ends inclusive) that hold
 personal data, so a consumer can blank them before storing:
 
-| Card             | Holder       | UID          |
-| ---------------- | ------------ | ------------ |
-| SI5              | 0x01-0x03    |              |
-| SI8              | 0x20-0x7F    | 0x00-0x03    |
-| SI9              | 0x20-0x37    | 0x00-0x03    |
-| SI10, SI11, SIAC | 0x20-0x9F    | 0x00-0x03    |
-| SI6              | not verified | not verified |
+| Card             | Holder               | UID       |
+| ---------------- | -------------------- | --------- |
+| SI5              | 0x01-0x03            |           |
+| SI6, SI6*        | 0x30-0x7F, 0x80-0xFB |           |
+| SI8              | 0x20-0x7F            | 0x00-0x03 |
+| SI9              | 0x20-0x37            | 0x00-0x03 |
+| SI10, SI11, SIAC | 0x20-0x9F            | 0x00-0x03 |
 
-SI6 exports no ranges and `personalRangesVerified` is `false`: its holder
-layout is unknown, so do not treat an empty list as "no personal data". The
-ranges are tested not to overlap any decoded race field (times, codes,
-punches, subseconds, SIAC reserve records and block-1 codes).
+SI6 keeps the holder's name, country and club in block 0 and the rest
+(phone, e-mail, address, birth date) in block 1, which the reader never
+fetches; both ranges are listed. SI6 has no chip serial. The ranges are
+tested not to overlap any decoded race field (times, codes, punches,
+subseconds, SIAC reserve records and block-1 codes).
 
 ## Command line
 

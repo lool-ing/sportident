@@ -207,7 +207,6 @@ const random = (): number => Math.floor(Math.random() * 256);
 
 describe('personal-data ranges leave the race fields alone', () => {
   for (const { slug, type } of SLUGS) {
-    if (type === 'SI6') continue;
     test(`${type}: bench image, holder random vs zeroed`, async () => {
       const image = toImage((await readBench(slug)).card.rawPages());
       for (let i = 0; i < 20; i++) {
@@ -279,11 +278,36 @@ describe('personal-data ranges leave the race fields alone', () => {
     }
   });
 
-  test('SI6 is marked not verified and exports no ranges', () => {
-    assert.strictEqual(RAW_LAYOUTS.SI6.personalRangesVerified, false);
-    assert.deepStrictEqual(RAW_LAYOUTS.SI6.personal, []);
-    for (const t of ['SI5', 'SI8', 'SI9', 'SI10', 'SI11', 'SIAC'] as const) {
-      assert.strictEqual(RAW_LAYOUTS[t].personalRangesVerified, true);
+  test('SI6 synthetic: holder text next to the clear record, times and punches survive', () => {
+    const img = new Array<number>(0x400).fill(0xee);
+    img.splice(0x0b, 3, 0x07, 0xa1, 0x20); // card number
+    img[0x12] = 2; // punch count
+    // finish, start, check and clear records: [ptd, code, time_hi, time_lo]
+    img.splice(0x14, 12, 0x01, 0x20, 0x11, 0x00, 0x01, 0x1f, 0x10, 0x00, 0x01, 0x05, 0x0f, 0x00);
+    img.splice(0x20, 4, 0x01, 0x00, 0x0e, 0x00);
+    for (let a = 0x30; a <= 0xfb; a++) img[a] = 0x41 + (a % 26); // holder text
+    img.splice(0x300, 8, 0x01, 0x1f, 0x10, 0x20, 0x01, 0x20, 0x10, 0x30);
+    const a = race('SI6', fill(img, 'SI6', random));
+    assert.deepStrictEqual(
+      a,
+      race(
+        'SI6',
+        fill(img, 'SI6', () => 0)
+      )
+    );
+    const result = (a as { result: Record<string, unknown> }).result;
+    assert.strictEqual((result.punches as unknown[]).length, 2);
+    for (const k of ['startTime', 'finishTime', 'checkTime', 'clearTime'])
+      assert.ok(typeof result[k] === 'number', k);
+  });
+
+  test('SI6 lists its holder ranges; every layout is verified', () => {
+    assert.deepStrictEqual(RAW_LAYOUTS.SI6.personal, [
+      { kind: 'holder', from: 0x30, to: 0x7f },
+      { kind: 'holder', from: 0x80, to: 0xfb },
+    ]);
+    for (const t of Object.keys(RAW_LAYOUTS) as (keyof typeof RAW_LAYOUTS)[]) {
+      assert.strictEqual(RAW_LAYOUTS[t].personalRangesVerified, true, t);
     }
   });
 });
