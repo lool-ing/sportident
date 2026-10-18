@@ -52,7 +52,13 @@ describe('decodeAutosendRecord', () => {
     assert.deepEqual(decodeAutosendRecord(SIAC_AM), {
       code: 78,
       card_number: 8123456,
-      clock: { seconds_in_half_day: 36930, half_day: 0, weekday: 0, subsec_256: 128 },
+      clock: {
+        seconds_in_half_day: 36930,
+        half_day: 0,
+        weekday: 0,
+        weekday_raw: 0,
+        subsec_256: 128,
+      },
       mem_address: 0x208,
     });
   });
@@ -66,8 +72,17 @@ describe('decodeAutosendRecord', () => {
       seconds_in_half_day: 3600,
       half_day: 1,
       weekday: 6,
+      weekday_raw: 6,
       subsec_256: 0,
     });
+  });
+
+  test('weekday 7 (not set): weekday null, as in card_read, and weekday_raw 7', () => {
+    const p = decodeAutosendRecord(
+      record({ code: 100, sn: [0, 0x7b, 0xf4, 0x40], td: 0b0000_1110, seconds: 3600 })
+    );
+    assert.equal(p?.clock.weekday, null);
+    assert.equal(p?.clock.weekday_raw, 7);
   });
 
   test('SI-Card 5: series byte times 100000 plus the number', () => {

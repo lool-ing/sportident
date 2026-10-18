@@ -16,7 +16,7 @@ import { EventEmitter } from 'node:events';
 
 import { proto } from './constants.ts';
 import type { HalfDayClock } from './output/ndjson.ts';
-import { arr2cardNumber, nextFrameStart, parse, SI_TIME_CUTOFF } from './siProtocol.ts';
+import { arr2cardNumber, dayOfWeekFromRaw, nextFrameStart, parse, SI_TIME_CUTOFF } from './siProtocol.ts';
 import type { FrameError, SiMessage } from './siProtocol.ts';
 import type { ISerialTransport } from './transport/ISerialTransport.ts';
 import type { TypedEventEmitter } from './utils/events.ts';
@@ -65,7 +65,9 @@ export const decodeAutosendRecord = (parameters: number[]): AutosendPunch | null
     clock: {
       seconds_in_half_day: seconds,
       half_day: (td & 1) as 0 | 1,
-      weekday: (td >> 1) & 0b111,
+      // Same meaning as in card_read: 0-6, null for 7 (not set), raw kept.
+      weekday: dayOfWeekFromRaw((td >> 1) & 0b111),
+      weekday_raw: (td >> 1) & 0b111,
       subsec_256: tss,
     },
     mem_address: (mem2 << 16) | (mem1 << 8) | mem0,
