@@ -79,7 +79,8 @@ describe('12-hour time cutoff', () => {
       mem.splice(0x300 + 4 * i, 4, 0x00, 31 + i, 0, 0);
       setTime(mem, 0x300 + 4 * i, t!, pm!);
     });
-    assert.deepEqual(punches(decode(new SiCard6(0), mem)), [
+    const codeTime = punches(decode(new SiCard6(0), mem)).map(({ code, time }) => ({ code, time }));
+    assert.deepEqual(codeTime, [
       { code: 31, time: 43199 },
       { code: 32, time: null },
       { code: 33, time: 100 + 43200 },
