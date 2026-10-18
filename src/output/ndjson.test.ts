@@ -130,6 +130,7 @@ describe('NdjsonEmitter', () => {
     setMockedClock();
     const bytes = new Array<number>(0x80).fill(0);
     for (let i = 0; i < 36; i++) bytes[getPunchOffset(i)] = 101 + i; // code; time bytes stay 0
+    bytes[0x17] = 36 + 1; // SI5 punch count byte: count + 1
     const card = new SiCard5(7050892);
     card._decodeFromStorage(bytes);
 
