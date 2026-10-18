@@ -433,25 +433,106 @@ describe('SiMainStation: timeout retry', () => {
     assert.ok(g1! >= 2490 && g2! >= 2490, `tries ${g1} and ${g2} ms apart`);
   });
 
-  test("noise in front of the page-4 reply: the retry's reply is used, never the old bytes", async () => {
-    const stale = (A.storageData as number[]).slice();
-    stale[4 * 128 + 1] = 200; // first punch code in the old copy
+  test('noise in front of the page-4 reply: after the frame limit the reply behind it answers', async () => {
+    const behind = (A.storageData as number[]).slice();
+    behind[4 * 128 + 1] = 200; // marks the reply that came behind the noise
     const r = await run(
       {
         'A:4': (fake) => {
           setTimeout(() => {
             fake.onStation = 'B';
             fake.inject([...rem(a), ...det(b, 0x01)]);
-          }, 3000);
-          return { extra: [0x02, 0xef, 0xff, ...page(stale, 4)], next: 'A', drop: true };
+          }, 1500);
+          return { extra: [0x02, 0xef, 0xff, ...page(behind, 4)], next: 'A', drop: true };
         },
       },
       {},
-      3500
+      2000
     );
     assert.deepEqual(r.read, [a, b]);
     assert.deepEqual(r.errors, []);
-    assert.equal(firstCode(r.cards[0]!), (A.cardData.punches as { code: number }[])[0]!.code);
-    assert.deepEqual(r.log, ['GET p0 A', 'GET p4 A', 'GET p4 A', 'ACK', ...B_PAGES, 'ACK']);
+    assert.equal(
+      firstCode(r.cards[0]!),
+      200,
+      'the reply to this request, recovered before it timed out'
+    );
+    assert.deepEqual(r.log, ['GET p0 A', 'GET p4 A', 'ACK', ...B_PAGES, 'ACK']);
+  });
+});
+
+describe('SiMainStation: an incomplete frame while no request is pending', () => {
+  /** Drive the station with raw deliveries at given times; collect cards,
+   * frame errors and the fake's request log. */
+  const deliver = async (
+    steps: { ms: number; bytes: number[] }[],
+    waitMs: number
+  ): Promise<{ read: number[]; frameErrors: string[]; log: string[] }> => {
+    const fake = new FakeStation();
+    const station = new SiMainStation(fake);
+    const read: number[] = [];
+    const frameErrors: string[] = [];
+    station.on('cardRead', (c: BaseSiCard) => read.push(c.cardNumber));
+    station.on('frameError', (e: { error_code: string }) => frameErrors.push(e.error_code));
+    for (const step of steps) {
+      await new Promise((r) => setTimeout(r, step.ms));
+      fake.emit('data', step.bytes);
+    }
+    await new Promise((r) => setTimeout(r, waitMs));
+    await station.close();
+    return { read, frameErrors, log: fake.log };
+  };
+  const DET_A = det(a, 0x0f);
+  const READ_A = ['GET p0 A', 'GET p4 A', 'ACK'];
+
+  test('02 EF FF, then a card detection: after the frame time limit the card is read', async () => {
+    const r = await deliver(
+      [
+        { ms: 0, bytes: [0x02, 0xef, 0xff] },
+        { ms: 50, bytes: DET_A },
+      ],
+      1300
+    );
+    assert.deepEqual(r.read, [a]);
+    assert.deepEqual(r.frameErrors, ['truncated']);
+    assert.deepEqual(r.log, READ_A);
+  });
+
+  test('an STX inside the dropped bytes is no resync point unless a whole frame starts there', async () => {
+    const fakeDet = [0x02, 0xe8, 0x06, 0x00, 0x0a, 0x0f, 0x99, 0x99, 0x99, 0x00, 0x00, 0x03]; // bad CRC
+    const r = await deliver(
+      [
+        { ms: 0, bytes: [0x02, 0xef, 0xff, ...fakeDet] },
+        { ms: 50, bytes: DET_A },
+      ],
+      1300
+    );
+    assert.deepEqual(r.read, [a], 'only the real card, never 0x999999');
+    assert.deepEqual(r.log, READ_A);
+  });
+
+  test('a detection in three slow deliveries (within the limit) is read at once', async () => {
+    const r = await deliver(
+      [
+        { ms: 0, bytes: DET_A.slice(0, 1) },
+        { ms: 300, bytes: DET_A.slice(1, 6) },
+        { ms: 300, bytes: DET_A.slice(6) },
+      ],
+      100
+    );
+    assert.deepEqual(r.read, [a]);
+    assert.deepEqual(r.frameErrors, []);
+    assert.deepEqual(r.log, READ_A);
+  });
+
+  test('parts more than the limit apart: the head is dropped as truncated', async () => {
+    const r = await deliver(
+      [
+        { ms: 0, bytes: DET_A.slice(0, 6) },
+        { ms: 1200, bytes: DET_A.slice(6) },
+      ],
+      100
+    );
+    assert.deepEqual(r.read, []);
+    assert.deepEqual(r.frameErrors, ['truncated']);
   });
 });

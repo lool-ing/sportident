@@ -16,7 +16,7 @@ import { EventEmitter } from 'node:events';
 
 import { proto } from './constants.ts';
 import type { HalfDayClock } from './output/ndjson.ts';
-import { arr2cardNumber, parse, SI_TIME_CUTOFF } from './siProtocol.ts';
+import { arr2cardNumber, nextFrameStart, parse, SI_TIME_CUTOFF } from './siProtocol.ts';
 import type { FrameError, SiMessage } from './siProtocol.ts';
 import type { ISerialTransport } from './transport/ISerialTransport.ts';
 import type { TypedEventEmitter } from './utils/events.ts';
@@ -138,7 +138,7 @@ export class AutosendListener extends (EventEmitter as new () => TypedEventEmitt
         const bf = r.badFrame;
         // A stray STX can make later, whole frames look like this frame's
         // data: continue at the first whole frame inside it, if there is one.
-        const next = bf.code === 'crc_mismatch' ? this.nextFrameStart(buf) : -1;
+        const next = bf.code === 'crc_mismatch' ? nextFrameStart(buf) : -1;
         const consumed = next > 0 && next < bf.bytesConsumed ? next : bf.bytesConsumed;
         this.giveUp(bf.code, buf.slice(0, consumed));
         this.buffer = buf.slice(consumed);
@@ -165,23 +165,13 @@ export class AutosendListener extends (EventEmitter as new () => TypedEventEmitt
         // The rest never came, so the head was noise. Go on at the first
         // whole frame inside it, if there is one.
         const buf = this.buffer;
-        const next = this.nextFrameStart(buf);
+        const next = nextFrameStart(buf);
         const consumed = next > 0 ? next : buf.length;
         this.giveUp('truncated', buf.slice(0, consumed));
         this.buffer = buf.slice(consumed);
         this.drain();
       }, this.staleMs);
     }
-  }
-
-  /** Index (> 0) of the first STX in `buf` that starts a whole, valid frame. */
-  private nextFrameStart(buf: number[]): number {
-    for (let i = 1; i < buf.length; i++) {
-      if (buf[i] !== proto.STX) continue;
-      const m = parse(buf.slice(i)).message;
-      if (m && 'command' in m) return i;
-    }
-    return -1;
   }
 
   private giveUp(code: FrameError['error_code'], bytes: number[]): void {

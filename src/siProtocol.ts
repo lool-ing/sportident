@@ -339,6 +339,17 @@ export const parseAll = (
   return { messages, remainder: currentRemainder };
 };
 
+/** Index (> 0) of the first STX in `buf` that starts a whole, valid frame
+ * (CRC and ETX checked), or -1. An STX inside a payload is no frame start. */
+export const nextFrameStart = (buf: number[]): number => {
+  for (let i = 1; i < buf.length; i++) {
+    if (buf[i] !== proto.STX) continue;
+    const m = parse(buf.slice(i)).message;
+    if (m && 'command' in m) return i;
+  }
+  return -1;
+};
+
 export const render = (message: SiMessage): number[] => {
   const renderCommand = (m: SiMessageWithoutMode): number[] => {
     const commandString = [m.command, m.parameters.length, ...m.parameters];

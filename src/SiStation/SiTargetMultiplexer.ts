@@ -22,13 +22,23 @@
 // // See NOTICE.md for cumulative attribution.
 
 import { proto } from '../constants.ts';
-import { parseAll, render, type FrameError, type SiMessage } from '../siProtocol.ts';
+import {
+  nextFrameStart,
+  parseAll,
+  render,
+  type FrameError,
+  type SiMessage,
+} from '../siProtocol.ts';
 import { EventEmitter } from '../utils/events.ts';
 import type { ISerialTransport } from '../transport/ISerialTransport.ts';
 import { DeviceClosedError, NakError, SendTimeoutError } from '../transport/errors.ts';
 import { SiSendTask } from './SiSendTask.ts';
 
 const RECEIVE_BUFFER_CAP_BYTES = 64 * 1024;
+/** How long an unfinished frame may wait for its rest. The longest frame
+ * (261 bytes) takes 544 ms at 4800 baud; the rest is USB latency. Same as
+ * AutosendListener's default. */
+const INCOMPLETE_FRAME_MS = 1_000;
 const DEFAULT_TIMEOUT_MS = 2_000;
 
 /**
@@ -48,6 +58,8 @@ export class SiTargetMultiplexer extends EventEmitter {
   private pendingSendTasks: SiSendTask[] = [];
   private sendChain: Promise<unknown> = Promise.resolve();
   private isClosed = false;
+  /** Runs while an unfinished frame heads the receive buffer. */
+  private staleTimer: NodeJS.Timeout | undefined;
 
   constructor(transport: ISerialTransport) {
     super();
@@ -163,6 +175,7 @@ export class SiTargetMultiplexer extends EventEmitter {
   close(): Promise<void> {
     if (this.isClosed) return Promise.resolve();
     this.isClosed = true;
+    this._clearStaleTimer();
     this._abortAllPendingSends('multiplexer.close() invoked');
     return this.transport.close();
   }
@@ -175,6 +188,7 @@ export class SiTargetMultiplexer extends EventEmitter {
     // bounded-shrinkage guarantee).
     for (const b of bytes) this.receiveBuffer.push(b);
 
+    const before = this.receiveBuffer.length;
     const { messages, remainder } = parseAll(this.receiveBuffer, {
       // Direct callback wiring, no stdout interception.
       onFrameError: (err) => this.emit('frameError', err),
@@ -182,6 +196,14 @@ export class SiTargetMultiplexer extends EventEmitter {
     this.receiveBuffer = remainder;
 
     for (const m of messages) this._dispatch(m);
+
+    // An unfinished frame at the head gets INCOMPLETE_FRAME_MS from when it
+    // became the head (new bytes don't extend it). Noise like 02 EF FF would
+    // otherwise wait for 255 bytes and swallow the frames behind it.
+    if (this.receiveBuffer.length === 0 || remainder.length < before) this._clearStaleTimer();
+    if (this.receiveBuffer.length > 0 && !this.staleTimer && !this.isClosed) {
+      this.staleTimer = setTimeout(() => this._dropStaleHead(), INCOMPLETE_FRAME_MS);
+    }
 
     // cap the receive buffer so an adversarial
     // / noisy byte stream can't pin unbounded memory.
@@ -194,6 +216,28 @@ export class SiTargetMultiplexer extends EventEmitter {
       this.receiveBuffer = [];
       this.emit('frameError', overflowErr);
     }
+  }
+
+  /** The unfinished head never completed, so it was noise: go on at the first
+   * whole, valid frame inside it (not at any STX), if there is one. */
+  private _dropStaleHead(): void {
+    this.staleTimer = undefined;
+    const buf = this.receiveBuffer;
+    if (buf.length === 0) return; // eg cleared by a command timeout
+    const next = nextFrameStart(buf);
+    const consumed = next > 0 ? next : buf.length;
+    this.receiveBuffer = buf.slice(consumed);
+    this.emit('frameError', {
+      error_code: 'truncated',
+      raw_bytes: buf.slice(0, consumed),
+      bytes_consumed: consumed,
+    } satisfies FrameError);
+    this._onData([]);
+  }
+
+  private _clearStaleTimer(): void {
+    if (this.staleTimer) clearTimeout(this.staleTimer);
+    this.staleTimer = undefined;
   }
 
   /** Route a parsed message: either to the head pending task (if it matches
@@ -241,6 +285,7 @@ export class SiTargetMultiplexer extends EventEmitter {
   private _handleTransportClose(): void {
     if (this.isClosed) return;
     this.isClosed = true;
+    this._clearStaleTimer();
     this._abortAllPendingSends('transport closed');
     this.emit('close');
   }
