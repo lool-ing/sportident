@@ -236,6 +236,12 @@ class PlaybackTransport extends EventEmitter implements ISerialTransport {
   isExhausted(): boolean {
     return this.cursor >= this.steps.length;
   }
+
+  /** The first request the transcript still expects but never got, if any. */
+  unsentOut(): string | null {
+    const step = this.steps.slice(this.cursor).find((s) => s.dir === 'out');
+    return step ? hexEncode(step.bytes) : null;
+  }
 }
 
 /** Normalise ts_ms to 0 on a single NDJSON line so the diff isn't dominated by
@@ -338,6 +344,10 @@ export const replayFixture = async (
   const replayError = transport.getError();
   if (replayError) {
     return { matches: false, diff: replayError };
+  }
+  const unsent = transport.unsentOut();
+  if (unsent !== null) {
+    return { matches: false, diff: `out never sent: transcript expects '${unsent}'` };
   }
 
   // Compare with ts_ms normalised.
