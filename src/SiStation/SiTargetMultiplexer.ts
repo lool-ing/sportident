@@ -129,14 +129,16 @@ export class SiTargetMultiplexer extends EventEmitter {
    *
    * Chained onto the same sendChain as full commands so it serialises after
    * the preceding GET_SI5/GET_SI8 read and before any subsequent command.
+   * `stillWanted` is asked when its turn comes: false drops the ACK (the card
+   * left while it waited behind a draining write) and resolves false.
    *    */
-  sendBareAck(): Promise<void> {
+  sendBareAck(stillWanted: () => boolean = () => true): Promise<boolean> {
     if (this.isClosed) {
       return Promise.reject(new DeviceClosedError('multiplexer closed'));
     }
     // Return a promise that resolves after the send completes. The send is
     // appended to sendChain so it serialises after any in-flight commands.
-    return new Promise<void>((resolve, reject) => {
+    return new Promise<boolean>((resolve, reject) => {
       this.sendChain = this.sendChain
         .catch(() => undefined)
         .then(() => {
@@ -144,7 +146,8 @@ export class SiTargetMultiplexer extends EventEmitter {
             reject(new DeviceClosedError('transport closed before bare ACK'));
             return undefined;
           }
-          return this.transport.send([proto.ACK]).then(resolve, reject);
+          if (!stillWanted()) return resolve(false);
+          return this.transport.send([proto.ACK]).then(() => resolve(true), reject);
         });
     });
   }

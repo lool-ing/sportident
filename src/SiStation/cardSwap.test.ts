@@ -60,14 +60,31 @@ class FakeStation extends EventEmitter implements ISerialTransport {
   }
   /** ACK writes left that fail (a serial write error). */
   failAcks = 0;
+  /** The n-th ACK's write (1-based) drains until `release()`. */
+  holdAckAt = 0;
+  private acks = 0;
+  private held: Promise<void> | undefined;
+  release: () => void = () => undefined;
+  /** The write being sent now drains until `release()`; later writes wait. */
+  holdWrite(): void {
+    this.held = new Promise((resolve) => {
+      this.release = () => {
+        this.held = undefined;
+        resolve();
+      };
+    });
+  }
   send(bytes: number[]): Promise<void> {
     if (bytes.length === 1 && bytes[0] === proto.ACK && this.failAcks > 0) {
       this.failAcks--;
       this.note('ACK write failed');
       return Promise.reject(new Error('write failed'));
     }
+    if (bytes.length === 1 && bytes[0] === proto.ACK && ++this.acks === this.holdAckAt) {
+      this.holdWrite();
+    }
     this.answer(bytes);
-    return Promise.resolve();
+    return this.held ?? Promise.resolve();
   }
   inject(bytes: number[]): void {
     setImmediate(() => this.emit('data', bytes));
@@ -328,5 +345,46 @@ describe('SiMainStation: the same card detected again during its read', () => {
     await new Promise((r) => setTimeout(r, 50));
     await station.close();
     assert.deepEqual(read, [a, a]);
+  });
+});
+
+describe('SiMainStation: an ACK queued behind a draining write', () => {
+  const changeToB = (fake: FakeStation): void => {
+    fake.onStation = 'B';
+    fake.inject([...rem(a), ...det(b, 0x01)]);
+  };
+
+  test("A's ACK is dropped once A has left; A is reported, B is read", async () => {
+    const r = await run({
+      'A:4': (fake) => {
+        fake.holdWrite(); // GET 4 still drains when its reply comes
+        setTimeout(() => changeToB(fake), 20);
+        setTimeout(() => fake.release(), 60);
+        return { extra: [], next: 'A' };
+      },
+    });
+    assert.deepEqual(r.read, [a, b]);
+    assert.deepEqual(r.errors, []);
+    assert.deepEqual(r.log, ['GET p0 A', 'GET p4 A', ...B_PAGES, 'ACK']);
+  });
+
+  test('the ACK for a repeated detect is dropped once the card has left', async () => {
+    const fake = new FakeStation();
+    fake.holdAckAt = 2; // the ACK for the first repeat drains; the second waits
+    const station = new SiMainStation(fake);
+    const read: number[] = [];
+    station.on('cardRead', (c: BaseSiCard) => read.push(c.cardNumber));
+    fake.inject(det(a, 0x0f));
+    await new Promise((r) => setTimeout(r, 30));
+    fake.inject(det(a, 0x0f));
+    fake.inject(det(a, 0x0f));
+    await new Promise((r) => setTimeout(r, 20));
+    changeToB(fake);
+    await new Promise((r) => setTimeout(r, 20));
+    fake.release();
+    await new Promise((r) => setTimeout(r, 100));
+    await station.close();
+    assert.deepEqual(read, [a, b]);
+    assert.deepEqual(fake.log, ['GET p0 A', 'GET p4 A', 'ACK', 'ACK', ...B_PAGES, 'ACK']);
   });
 });

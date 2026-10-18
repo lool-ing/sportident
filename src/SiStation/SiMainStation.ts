@@ -214,7 +214,9 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
     ) {
       const card = BaseSiCard.detectFromMessage(message);
       if (card && card.cardNumber === this.ackedCardNumber) {
-        this.multiplexer.sendBareAck().catch((err: Error) => this.emit('error', err));
+        this.multiplexer
+          .sendBareAck(() => this.ackedCardNumber === card.cardNumber)
+          .catch((err: Error) => this.emit('error', err));
         return;
       }
       // Restarting would only lose the replies already on their way.
@@ -245,8 +247,10 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
           if (this.readingCard !== card) return;
           // Still reading until the ACK is out: a failed write leaves no lock,
           // so the next detect reads the card again.
-          await this.multiplexer.sendBareAck();
-          if (this.readingCard !== card) return;
+          // Checked again when the ACK's turn comes: it may wait behind a
+          // draining write while the card leaves and the next one comes in.
+          const sent = await this.multiplexer.sendBareAck(() => this.readingCard === card);
+          if (!sent || this.readingCard !== card) return;
           this.readingCard = undefined;
           this.ackedCardNumber = card.cardNumber;
         })
