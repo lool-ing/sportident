@@ -28,8 +28,17 @@ const CARD_CLASSES: Record<string, new (cardNumber: number) => BaseSiCard> = {
 export const decodeRawPages = (raw: RawPages): BaseSiCard => {
   const Card = Object.hasOwn(CARD_CLASSES, raw.cardType) ? CARD_CLASSES[raw.cardType] : undefined;
   if (!Card) throw new Error(`decodeRawPages: unknown card type ${String(raw.cardType)}`);
+  const card = new Card(0);
+  const blockCount = card.storage.data.length / RAW_BLOCK_SIZE;
   const bytes: (number | undefined)[] = [];
+  const seen = new Set<number>();
   for (const { block, bytes: b } of raw.blocks) {
+    if (!Number.isInteger(block) || block < 0 || block >= blockCount || seen.has(block)) {
+      throw new Error(
+        `decodeRawPages: block ${String(block)} is not a single block 0-${blockCount - 1} of ${raw.cardType}`
+      );
+    }
+    seen.add(block);
     if (b.length !== RAW_BLOCK_SIZE) {
       throw new Error(
         `decodeRawPages: block ${block} has ${b.length} bytes, expected ${RAW_BLOCK_SIZE}`
@@ -38,7 +47,6 @@ export const decodeRawPages = (raw: RawPages): BaseSiCard => {
     bytes.length = Math.max(bytes.length, (block + 1) * RAW_BLOCK_SIZE);
     bytes.splice(block * RAW_BLOCK_SIZE, RAW_BLOCK_SIZE, ...b);
   }
-  const card = new Card(0);
   (card as unknown as { _decodeFromStorage(b: (number | undefined)[]): void })._decodeFromStorage(
     bytes
   );

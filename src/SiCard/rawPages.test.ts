@@ -338,6 +338,20 @@ describe('decodeRawPages', () => {
     );
   });
 
+  test('rejects a block number outside the card, not whole, or repeated', () => {
+    const block = (n: number) => ({ block: n, bytes: new Uint8Array(RAW_BLOCK_SIZE) });
+    for (const blocks of [[block(-1)], [block(1)], [block(0.5)], [block(0), block(0)]]) {
+      assert.throws(
+        () => decodeRawPages({ cardType: 'SI5', layout: 'si5', blocks }),
+        /is not a single block 0-0 of SI5/
+      );
+    }
+    assert.throws(
+      () => decodeRawPages({ cardType: 'SIAC', layout: 'modern', blocks: [block(8)] }),
+      /block 8 is not a single block 0-7 of SIAC/
+    );
+  });
+
   test('rejects a block that is not 128 bytes', () => {
     assert.throws(
       () =>
