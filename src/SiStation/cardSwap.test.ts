@@ -154,8 +154,8 @@ const run = async (
 const a = A.cardData.cardNumber;
 const b = B.cardData.cardNumber;
 const swapTo = (): ReturnType<Hook> => ({ extra: [...rem(a), ...det(b, 0x01)], next: 'B' });
-/** B read alone: SI9 asks for pages 0 and 1. */
-const B_PAGES = ['GET p0 B', 'GET p1 B'];
+/** B read alone: an SI9 with 2 punches needs page 0 only. */
+const B_PAGES = ['GET p0 B'];
 /** Exactly one ACK, after the last page request. */
 const assertOneAckAtEnd = (log: string[]): void => {
   assert.deepEqual(

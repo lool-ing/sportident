@@ -38,11 +38,12 @@ import {
 } from './ModernSiCard.ts';
 
 class ReadFinishedException {}
-const punchesPerPage = 32;
 const bytesPerPage = 128;
 const MAX_NUM_PUNCHES = 50;
 
 export const getPunchOffset = (i: number): number => 0x38 + i * 4;
+/** Punches that fit in page 0 after the header and card holder (0x38-0x7F). */
+const PAGE0_PUNCHES = (bytesPerPage - getPunchOffset(0)) / 4;
 
 const parseSiCard9CardHolderString = (
   semicolonSeparatedString: string
@@ -122,7 +123,9 @@ export class SiCard9 extends ModernSiCard {
       .then((page0) => {
         this.storage.splice(bytesPerPage * 0, bytesPerPage, ...page0);
         if (
-          (this.storage.get('punchCount')?.value ?? 0) <= punchesPerPage * 0 &&
+          // Page 1 holds only punches 19-50: with 18 or fewer it has nothing to
+          // read (past the count it may hold old records, which are cut anyway).
+          (this.storage.get('punchCount')?.value ?? 0) <= PAGE0_PUNCHES &&
           !this.needsBlock1()
         ) {
           throw new ReadFinishedException();
