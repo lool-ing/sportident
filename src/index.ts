@@ -63,6 +63,8 @@ export { SIAC } from './SiCard/types/SIAC.ts';
 export { ModernSiCard } from './SiCard/types/ModernSiCard.ts';
 export type { IRaceResultData, IPunch } from './SiCard/IRaceResultData.ts';
 export { RAW_LAYOUTS, RAW_BLOCK_SIZE } from './SiCard/rawPages.ts';
+export { decodeRawPages } from './SiCard/decodeRawPages.ts';
+export { VERSION } from './version.ts';
 export type {
   RawPages,
   RawBlock,

@@ -72,6 +72,17 @@ number. A block that is not listed was never read; a listed block is complete.
 `lool-readout --include-raw-pages` adds the same data to each `card_read` line
 as `raw_pages: { layout, blocks: [{ block, b64 }] }`.
 
+`decodeRawPages(raw)` runs the same decoder on a `RawPages` (for example a
+sanitised copy) and returns the card, with the card number taken from the
+bytes and unlisted blocks left unread. It throws on an unknown `cardType` or
+a block that is not 128 bytes. `VERSION` is the library version.
+
+```ts
+import { decodeRawPages, VERSION } from '@lool-ing/sportident';
+
+const { raceResult } = decodeRawPages(sanitised); // raceResult.punchCount, ...
+```
+
 The library does not sanitise. `RAW_LAYOUTS[cardType].personal` lists the
 card addresses (`block * 128 + offset`, both ends inclusive) that hold
 personal data, so a consumer can blank them before storing:

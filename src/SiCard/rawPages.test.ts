@@ -13,6 +13,8 @@ import { proto } from '../constants.ts';
 import { parseAll, type SiMessage } from '../siProtocol.ts';
 import { NdjsonEmitter } from '../output/ndjson.ts';
 import { BaseSiCard } from './BaseSiCard.ts';
+import { decodeRawPages } from './decodeRawPages.ts';
+import { VERSION } from '../version.ts';
 import { RAW_BLOCK_SIZE, RAW_LAYOUTS, type RawPages } from './rawPages.ts';
 import { SiCard5 } from './types/SiCard5.ts';
 import { SiCard6 } from './types/SiCard6.ts';
@@ -312,4 +314,44 @@ describe('personal-data ranges leave the race fields alone', () => {
       assert.strictEqual(RAW_LAYOUTS[t].personalRangesVerified, true, t);
     }
   });
+});
+
+describe('decodeRawPages', () => {
+  for (const { slug, type } of SLUGS) {
+    test(`${slug}-bench-001 decodes like the original read`, async () => {
+      const { card } = await readBench(slug);
+      const decoded = decodeRawPages(card.rawPages());
+      assert.strictEqual(decoded.cardType, type);
+      assert.deepStrictEqual(decoded.raceResult, card.raceResult);
+      assert.strictEqual(decoded.raceResult.punches?.length, card.raceResult.punches?.length);
+    });
+  }
+
+  test('rejects an unknown card type', () => {
+    assert.throws(
+      () => decodeRawPages({ cardType: 'SI99' as never, layout: 'si8', blocks: [] }),
+      /unknown card type SI99/
+    );
+    assert.throws(
+      () => decodeRawPages({ cardType: 'toString' as never, layout: 'si8', blocks: [] }),
+      /unknown card type/
+    );
+  });
+
+  test('rejects a block that is not 128 bytes', () => {
+    assert.throws(
+      () =>
+        decodeRawPages({
+          cardType: 'SI8',
+          layout: 'si8',
+          blocks: [{ block: 0, bytes: new Uint8Array(64) }],
+        }),
+      /block 0 has 64 bytes/
+    );
+  });
+});
+
+test('VERSION equals package.json', () => {
+  const pkg = JSON.parse(fs.readFileSync(path.resolve(HERE, '..', '..', 'package.json'), 'utf8'));
+  assert.strictEqual(VERSION, pkg.version);
 });
