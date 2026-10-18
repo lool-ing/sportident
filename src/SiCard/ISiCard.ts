@@ -27,6 +27,11 @@ export interface IBaseSiCardStorageFields {
   /** Subsecond of the start/finish time in 1/256 s (0-255): PTD bit 7 set, CN = TSS. Absent: no fraction. SI6 and newer. */
   startSubsec256?: number;
   finishSubsec256?: number;
+  /** Raw day-of-week field (PTD bits 3-1, 0-7; see dayOfWeekFromRaw) of the record, SI6 and newer. Not a date. */
+  startWeekdayRaw?: number;
+  finishWeekdayRaw?: number;
+  checkWeekdayRaw?: number;
+  clearWeekdayRaw?: number;
   punchCount: number;
   punches: IPunch[];
   cardHolder: { [key: string]: unknown };

@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { proto } from '../../constants.ts';
 import { BaseSiCard } from '../BaseSiCard.ts';
 import { SiCard6 } from './SiCard6.ts';
+import { withoutWeekday } from './punchesWithoutWeekday.ts';
 
 const hex = (s: string): number[] =>
   s
@@ -51,7 +52,7 @@ describe('SiCard6', () => {
     assert.equal(card.raceResult.finishTime, 10250);
     assert.equal(card.raceResult.checkTime, 38283 + PM);
     assert.equal(card.raceResult.clearTime, 38262 + PM);
-    assert.deepEqual(card.raceResult.punches, expectedPunches);
+    assert.deepEqual(withoutWeekday(card.raceResult.punches), expectedPunches);
   });
 
   test('reads blocks 0 and 6 over the wire (data after addr + block bytes)', async () => {
@@ -67,7 +68,7 @@ describe('SiCard6', () => {
     };
     await card.read();
     assert.deepEqual(asked, [0, 6]); // 16 punches: block 7 not needed
-    assert.deepEqual(card.raceResult.punches, expectedPunches);
+    assert.deepEqual(withoutWeekday(card.raceResult.punches), expectedPunches);
   });
 
   test('SI6_DET (0xE6) detects an SI6, other detect commands do not', () => {

@@ -15,7 +15,13 @@
 // See NOTICE.md for cumulative attribution.
 
 import { proto } from '../../constants.ts';
-import { SiTime, arr2cardNumber, siPunchCode, siSubsec256 } from '../../siProtocol.ts';
+import {
+  SiTime,
+  arr2cardNumber,
+  siPunchCode,
+  siSubsec256,
+  siWeekdayRaw,
+} from '../../siProtocol.ts';
 import { type SiStorage, type SiStorageLocations, defineStorage } from '../../storage/SiStorage.ts';
 import { SiArray } from '../../storage/SiArray.ts';
 import { SiDataType } from '../../storage/SiDataType.ts';
@@ -77,6 +83,10 @@ export const siCard6StorageLocations: SiStorageLocations<ISiCard6StorageFields> 
   startCode: siCard6StartFinishCode(0x18),
   finishCode: siCard6StartFinishCode(0x14),
   checkCode: siPunchCode(0x1c),
+  startWeekdayRaw: siWeekdayRaw(0x18),
+  finishWeekdayRaw: siWeekdayRaw(0x14),
+  checkWeekdayRaw: siWeekdayRaw(0x1c),
+  clearWeekdayRaw: siWeekdayRaw(0x20),
   startSubsec256: siSubsec256(0x18),
   finishSubsec256: siSubsec256(0x14),
   clearTime: new SiTime([[0x23], [0x22]], 0x20),
@@ -88,6 +98,7 @@ export const siCard6StorageLocations: SiStorageLocations<ISiCard6StorageFields> 
         new SiDict({
           code: siPunchCode(getPunchOffset(i)),
           time: new SiTime([[getPunchOffset(i) + 3], [getPunchOffset(i) + 2]], getPunchOffset(i)),
+          weekdayRaw: siWeekdayRaw(getPunchOffset(i)),
         })
     ),
     (allPunches) => cropPunches(allPunches as (PotentialSiCard6Punch | undefined)[])
@@ -147,6 +158,9 @@ export class SiCard6 extends BaseSiCard {
     if (cn !== undefined) this.raceResult.cardNumber = cn;
     const startTime = this.storage.get('startTime')?.value;
     if (startTime !== undefined) this.raceResult.startTime = startTime;
+    const startWeekday = this.storage.get('startWeekdayRaw')?.value;
+    if (startTime != null && startWeekday !== undefined)
+      this.raceResult.startWeekdayRaw = startWeekday;
     const startCode = this.storage.get('startCode')?.value;
     if (startTime != null && startCode !== undefined) this.raceResult.startCode = startCode;
     const startSubsec = this.storage.get('startSubsec256')?.value;
@@ -154,6 +168,9 @@ export class SiCard6 extends BaseSiCard {
       this.raceResult.startSubsec256 = startSubsec;
     const finishTime = this.storage.get('finishTime')?.value;
     if (finishTime !== undefined) this.raceResult.finishTime = finishTime;
+    const finishWeekday = this.storage.get('finishWeekdayRaw')?.value;
+    if (finishTime != null && finishWeekday !== undefined)
+      this.raceResult.finishWeekdayRaw = finishWeekday;
     const finishCode = this.storage.get('finishCode')?.value;
     if (finishTime != null && finishCode !== undefined) this.raceResult.finishCode = finishCode;
     const finishSubsec = this.storage.get('finishSubsec256')?.value;
@@ -161,10 +178,16 @@ export class SiCard6 extends BaseSiCard {
       this.raceResult.finishSubsec256 = finishSubsec;
     const checkTime = this.storage.get('checkTime')?.value;
     if (checkTime !== undefined) this.raceResult.checkTime = checkTime;
+    const checkWeekday = this.storage.get('checkWeekdayRaw')?.value;
+    if (checkTime != null && checkWeekday !== undefined)
+      this.raceResult.checkWeekdayRaw = checkWeekday;
     const checkCode = this.storage.get('checkCode')?.value;
     if (checkTime != null && checkCode !== undefined) this.raceResult.checkCode = checkCode;
     const clearTime = this.storage.get('clearTime')?.value;
     if (clearTime !== undefined) this.raceResult.clearTime = clearTime;
+    const clearWeekday = this.storage.get('clearWeekdayRaw')?.value;
+    if (clearTime != null && clearWeekday !== undefined)
+      this.raceResult.clearWeekdayRaw = clearWeekday;
     const punches = this.storage.get('punches')?.value;
     // Slots past the punch count may still hold old punches.
     if (punches !== undefined)

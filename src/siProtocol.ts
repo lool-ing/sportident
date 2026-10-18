@@ -464,6 +464,15 @@ export const siRecordCode = (
 export const siacBlock1Code = (offset: number): SiModified<number, number> =>
   new SiModified(new SiInt([[offset]]), (b) => (b === 0x00 ? undefined : b));
 
+/** Raw day-of-week field of a PTD record: bits 3-1 of the byte at `ptdOffset`
+ * (0-7). Not a date: the card stores none. */
+export const siWeekdayRaw = (ptdOffset: number): SiInt => new SiInt([[ptdOffset, 1, 4]]);
+
+/** Day of week from the raw PTD value: 0 Sunday ... 6 Saturday, null for 7 (not
+ * set or invalid; SPORTident.Communication 2.59.0 on a synthetic image of
+ * siac-bench-001, 2026-10-18). */
+export const dayOfWeekFromRaw = (raw: number): number | null => (raw <= 6 ? raw : null);
+
 /** Subsecond of a START or FINISH record (never check/clear/ordinary punches:
  * the doc allows a subsecond value "only for start and finish"): when PTD
  * bit 7 is set, CN is TSS in 1/256 s (SPORTident card data structure doc,

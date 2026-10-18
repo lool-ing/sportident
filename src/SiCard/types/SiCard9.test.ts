@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 
 import { SiCard9 } from './SiCard9.ts';
 import { fixture as si9 } from '../../../tests/fixtures/upstream/si9-typical.ts';
+import { withoutWeekday } from './punchesWithoutWeekday.ts';
 
 function decodeSi9(storage: (number | undefined)[]): { [k: string]: unknown } {
   const card = new SiCard9(0);
@@ -19,7 +20,7 @@ function decodeSi9(storage: (number | undefined)[]): { [k: string]: unknown } {
     finishTime: card.raceResult.finishTime ?? null,
     checkTime: card.raceResult.checkTime ?? null,
     punchCount: card.punchCount,
-    punches: card.raceResult.punches,
+    punches: withoutWeekday(card.raceResult.punches),
     cardHolder: card.raceResult.cardHolder,
   };
 }

@@ -6,7 +6,7 @@
 // timestamps ms-epoch numbers, schema_version=1 locked on every event.
 //
 // Card-internal half-day clock fields stay raw `{seconds_in_half_day, half_day,
-// weekday}` — Phase 0 emits
+// weekday, weekday_raw}` — Phase 0 emits
 // the card's wire-format timestamp; Phase 1 reconstructs wall-clock against the
 // event date.
 //
@@ -22,7 +22,7 @@
 
 import type { FrameError } from '../siProtocol.ts';
 import type { BaseSiCard } from '../SiCard/BaseSiCard.ts';
-import { SI_TIME_CUTOFF } from '../siProtocol.ts';
+import { SI_TIME_CUTOFF, dayOfWeekFromRaw } from '../siProtocol.ts';
 
 // ---------------------------------------------------------------------------
 // Public event types (re-exported through src/index.ts for downstream consumers
@@ -60,7 +60,11 @@ export interface CardInsertedEvent extends NdjsonBase {
 export interface HalfDayClock {
   seconds_in_half_day: number;
   half_day: 0 | 1;
+  /** Day of week from the record's PTD bits 3-1: 0 Sunday ... 6 Saturday. null: not
+   * set (raw 7) or no PTD (SI5). A day of the week, never a date: the card stores none. */
   weekday: number | null;
+  /** The raw 3-bit value (0-7; 7 = not set or invalid). Absent without PTD (SI5). */
+  weekday_raw?: number;
   /** Station code (CN) of the unit that stamped this time. Start, finish and
    * check on SI6 and newer only; absent otherwise. */
   code?: number;
@@ -76,7 +80,10 @@ export interface NdjsonPunch {
    * slots 31-36 (code only) or a stored time out of range. */
   seconds_in_half_day: number | null;
   half_day: 0 | 1 | null;
+  /** As HalfDayClock.weekday. */
   weekday: number | null;
+  /** As HalfDayClock.weekday_raw. */
+  weekday_raw?: number;
 }
 
 export interface CardReadEvent extends NdjsonBase {
@@ -186,18 +193,16 @@ const snakeCaseKeys = (obj: Record<string, unknown>): Record<string, unknown> =>
  * is AM -> half_day=0. Phase 0's wire format already normalises into this
  * range (see SiTime in siProtocol.ts), so no further math is required.
  *
- * Weekday is not present in the SiTimestamp scalar (upstream SiTime returns a
- * plain `number | null`), so this helper always emits `weekday: null`. The
- * weekday byte lives elsewhere in storage and is currently not exposed by the
- * Phase 0 decoders. Phase 1 will plumb it through when wall-clock
- * reconstruction becomes important.
+ * The day of week is not in the SiTimestamp scalar; the caller passes the raw
+ * PTD value (`weekdayRaw`, 0-7) when the record has one.
  */
 // Exported so other code can build the same half-day clock shape as the
 // NDJSON wire format.
 export const toHalfDayClock = (
   raw: number | null | undefined,
   code?: number | null,
-  subsec256?: number
+  subsec256?: number,
+  weekdayRaw?: number
 ): HalfDayClock | null => {
   if (raw === null || raw === undefined) return null;
   const half_day = raw >= SI_TIME_CUTOFF ? 1 : 0;
@@ -206,6 +211,10 @@ export const toHalfDayClock = (
   // Only start/finish/check from SI6 and newer carry a station code.
   if (typeof code === 'number') clock.code = code;
   if (typeof subsec256 === 'number') clock.subsec_256 = subsec256;
+  if (typeof weekdayRaw === 'number') {
+    clock.weekday = dayOfWeekFromRaw(weekdayRaw);
+    clock.weekday_raw = weekdayRaw;
+  }
   return clock;
 };
 
@@ -281,27 +290,39 @@ export class NdjsonEmitter {
     };
     const c = card as WithCounts;
     const punches = (raceResult.punches ?? []).map((p): NdjsonPunch => {
-      const clock = toHalfDayClock(p.time);
+      const clock = toHalfDayClock(p.time, undefined, undefined, p.weekdayRaw);
       return {
         code: p.code,
         // A missing time stays null so a code-only punch differs from 00:00:00.
         seconds_in_half_day: clock?.seconds_in_half_day ?? null,
         half_day: clock?.half_day ?? null,
         weekday: clock?.weekday ?? null,
+        ...(clock?.weekday_raw !== undefined && { weekday_raw: clock.weekday_raw }),
       };
     });
     const event: CardReadEvent = {
       ...this._base('card_read'),
       card_type,
       card_number: raceResult.cardNumber ?? card.cardNumber,
-      start: toHalfDayClock(raceResult.startTime, raceResult.startCode, raceResult.startSubsec256),
+      start: toHalfDayClock(
+        raceResult.startTime,
+        raceResult.startCode,
+        raceResult.startSubsec256,
+        raceResult.startWeekdayRaw
+      ),
       finish: toHalfDayClock(
         raceResult.finishTime,
         raceResult.finishCode,
-        raceResult.finishSubsec256
+        raceResult.finishSubsec256,
+        raceResult.finishWeekdayRaw
       ),
-      check: toHalfDayClock(raceResult.checkTime, raceResult.checkCode),
-      clear: toHalfDayClock(raceResult.clearTime),
+      check: toHalfDayClock(
+        raceResult.checkTime,
+        raceResult.checkCode,
+        undefined,
+        raceResult.checkWeekdayRaw
+      ),
+      clear: toHalfDayClock(raceResult.clearTime, undefined, undefined, raceResult.clearWeekdayRaw),
       punch_count: c.punchCount ?? punches.length,
       punches,
       card_holder:

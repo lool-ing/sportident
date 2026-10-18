@@ -35,6 +35,7 @@ export {
   date2arr,
   prettyMessage,
   SI_TIME_CUTOFF,
+  dayOfWeekFromRaw,
 } from './siProtocol.ts';
 export type {
   SiMessage,

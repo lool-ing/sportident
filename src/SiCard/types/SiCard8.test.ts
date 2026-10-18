@@ -10,6 +10,7 @@ import { BaseSiCard } from '../BaseSiCard.ts';
 import { SiCard8 } from './SiCard8.ts';
 import { SiCard9 } from './SiCard9.ts';
 import { SiCard11 } from './SiCard11.ts';
+import { withoutWeekday } from './punchesWithoutWeekday.ts';
 
 /** PTD bit 0 marks PM (documented, SPORTident doc); where this synthetic data
  * (upstream sportident.js fixture) sets it, times are +12 h. */
@@ -63,7 +64,7 @@ describe('SiCard8', () => {
     assert.equal(card.punchCount, 16);
     assert.equal(card.raceResult.startTime, 8721 + PM);
     assert.equal(card.raceResult.checkTime, 8735 + PM);
-    assert.deepEqual(card.raceResult.punches, expectedPunches);
+    assert.deepEqual(withoutWeekday(card.raceResult.punches), expectedPunches);
   });
 
   test('reads pages 0 and 1 over the wire', async () => {
@@ -78,7 +79,7 @@ describe('SiCard8', () => {
     };
     await card.read();
     assert.deepEqual(asked, [0, 1]);
-    assert.deepEqual(card.raceResult.punches, expectedPunches);
+    assert.deepEqual(withoutWeekday(card.raceResult.punches), expectedPunches);
   });
 });
 

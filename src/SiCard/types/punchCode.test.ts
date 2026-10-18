@@ -25,6 +25,7 @@ import { SiCard11 } from './SiCard11.ts';
 import { SIAC } from './SIAC.ts';
 import { getPunchOffset as modernPunchOffset } from './ModernSiCard.ts';
 import { fixture as si10 } from '../../../tests/fixtures/upstream/si10-typical.ts';
+import { withoutWeekday } from './punchesWithoutWeekday.ts';
 
 const CODE_300_RECORD = [0x41, 0x2c, 0x0e, 0x10];
 const CODE_300_PUNCH = { code: 300, time: 3600 + 43_200 };
@@ -38,7 +39,7 @@ function withCode300(storage: readonly (number | undefined)[], offset: number): 
 
 interface Decodable {
   _decodeFromStorage(bytes: (number | undefined)[]): void;
-  raceResult: { punches?: { code: number; time: number | null }[] };
+  raceResult: { punches?: { code: number; time: number | null; weekdayRaw?: number }[] };
 }
 
 describe('punch control code: PTD bit 6 is code bit 8, bit 7 is not a code bit', () => {
@@ -51,9 +52,12 @@ describe('punch control code: PTD bit 6 is code bit 8, bit 7 is not a code bit',
       const card: Decodable = new Card(0);
       card._decodeFromStorage(withCode300(si10.storageData, modernPunchOffset(0)));
       const punches = card.raceResult.punches ?? [];
-      assert.deepStrictEqual(punches[0], CODE_300_PUNCH);
+      assert.deepStrictEqual(withoutWeekday(punches)[0], CODE_300_PUNCH);
       // The other 15 punches have PTD bits 6-7 clear and decode as before.
-      assert.deepStrictEqual(punches.slice(1), (si10.cardData['punches'] as unknown[]).slice(1));
+      assert.deepStrictEqual(
+        withoutWeekday(punches).slice(1),
+        (si10.cardData['punches'] as unknown[]).slice(1)
+      );
     });
   }
 
@@ -65,7 +69,7 @@ describe('punch control code: PTD bit 6 is code bit 8, bit 7 is not a code bit',
     test(`${name}: a punch record with PTD 0x41 decodes as control 300`, () => {
       const decodable: Decodable = card;
       decodable._decodeFromStorage(withCode300(Array<number>(0x400).fill(0xee), offset));
-      assert.deepStrictEqual(decodable.raceResult.punches, [CODE_300_PUNCH]);
+      assert.deepStrictEqual(withoutWeekday(decodable.raceResult.punches), [CODE_300_PUNCH]);
     });
   }
 

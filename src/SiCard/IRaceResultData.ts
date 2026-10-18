@@ -22,6 +22,11 @@ export interface IRaceResultData {
   /** Subsecond of the start/finish time in 1/256 s (0-255): PTD bit 7 set, CN = TSS. Absent: no fraction. SI6 and newer. */
   startSubsec256?: number;
   finishSubsec256?: number;
+  /** Raw day-of-week field (PTD bits 3-1, 0-7; see dayOfWeekFromRaw) of the record, SI6 and newer. Not a date. */
+  startWeekdayRaw?: number;
+  finishWeekdayRaw?: number;
+  checkWeekdayRaw?: number;
+  clearWeekdayRaw?: number;
   /** SIAC reserve records (block 3): the FIRST start/finish punch after a clear;
    * the main record is the last. Time absent: not read (block 3 not read, or a
    * card without reserve records); null: read and empty (erased, 0xEEEE). Code
@@ -45,4 +50,6 @@ export interface IRaceResultData {
 export interface IPunch {
   code: number;
   time: SiTimestamp;
+  /** Raw day-of-week field (PTD bits 3-1, 0-7; see dayOfWeekFromRaw). Absent on SI5. Not a date. */
+  weekdayRaw?: number;
 }

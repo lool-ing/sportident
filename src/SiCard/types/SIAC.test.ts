@@ -19,6 +19,7 @@ import './SiCard9.ts';
 import { SiCard5 } from './SiCard5.ts';
 import { fixture as siac } from '../../../tests/fixtures/upstream/siac-typical.ts';
 import { fixture as empty } from '../../../tests/fixtures/upstream/empty-card.ts';
+import { withoutWeekday } from './punchesWithoutWeekday.ts';
 
 function decodeSiac(storage: (number | undefined)[]): { [k: string]: unknown } {
   const card = new SIAC(0);
@@ -31,7 +32,7 @@ function decodeSiac(storage: (number | undefined)[]): { [k: string]: unknown } {
     finishTime: card.raceResult.finishTime ?? null,
     checkTime: card.raceResult.checkTime ?? null,
     punchCount: card.punchCount,
-    punches: card.raceResult.punches,
+    punches: withoutWeekday(card.raceResult.punches),
     cardHolder: card.raceResult.cardHolder,
   };
 }
