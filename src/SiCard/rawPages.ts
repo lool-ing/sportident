@@ -45,9 +45,9 @@ const holder = (from: number, to: number): PersonalRange => ({ kind: 'holder', f
 const uid: PersonalRange = { kind: 'uid', from: 0x00, to: 0x03 };
 
 // Offsets from the decoders: SiCard5 cardHolder 0x01-0x03; SiCard8 cardHolder
-// 0x20 + 0x60 bytes; SiCard9 0x20 + 0x18; ModernSiCard cardHolder 0x20 + 0x80
-// and uid 0x00-0x03. The race fields next to them (SI8 punches from 0x88, SI9
-// from 0x38, modern punches from block 4, SIAC codes at 0xA4-0xA9) are outside.
+// 0x20 + 0x60 bytes; SiCard9 0x20 + 0x18; ModernSiCard cardHolder 0x20 + 0x80;
+// uid 0x00-0x03 on SI8, SI9 and modern cards. The race fields next to them
+// (card number 0x19-0x1B, SI8 punches from 0x88, SI9 from 0x38, modern punches from block 4, SIAC codes at 0xA4-0xA9) are outside.
 const modern: RawLayout = {
   layout: 'modern',
   personalRangesVerified: true,
@@ -61,8 +61,8 @@ export const RAW_LAYOUTS: Record<
   SI5: { layout: 'si5', personalRangesVerified: true, personal: [holder(0x01, 0x03)] },
   // Clear record at 0x20-0x23; the holder layout is unknown.
   SI6: { layout: 'si6', personalRangesVerified: false, personal: [] },
-  SI8: { layout: 'si8', personalRangesVerified: true, personal: [holder(0x20, 0x7f)] },
-  SI9: { layout: 'si9', personalRangesVerified: true, personal: [holder(0x20, 0x37)] },
+  SI8: { layout: 'si8', personalRangesVerified: true, personal: [uid, holder(0x20, 0x7f)] },
+  SI9: { layout: 'si9', personalRangesVerified: true, personal: [uid, holder(0x20, 0x37)] },
   SI10: modern,
   SI11: modern,
   SIAC: modern,

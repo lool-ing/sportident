@@ -79,16 +79,15 @@ personal data, so a consumer can blank them before storing:
 | Card             | Holder       | UID          |
 | ---------------- | ------------ | ------------ |
 | SI5              | 0x01-0x03    |              |
-| SI8              | 0x20-0x7F    |              |
-| SI9              | 0x20-0x37    |              |
+| SI8              | 0x20-0x7F    | 0x00-0x03    |
+| SI9              | 0x20-0x37    | 0x00-0x03    |
 | SI10, SI11, SIAC | 0x20-0x9F    | 0x00-0x03    |
 | SI6              | not verified | not verified |
 
 SI6 exports no ranges and `personalRangesVerified` is `false`: its holder
 layout is unknown, so do not treat an empty list as "no personal data". The
 ranges are tested not to overlap any decoded race field (times, codes,
-punches, subseconds, SIAC reserve records and block-1 codes). SI8 and SI9
-cards also carry the UID at 0x00-0x03; it is not listed for them.
+punches, subseconds, SIAC reserve records and block-1 codes).
 
 ## Command line
 
