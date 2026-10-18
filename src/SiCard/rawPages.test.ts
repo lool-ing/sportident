@@ -36,13 +36,14 @@ const SLUGS: ReadonlyArray<{ slug: string; type: keyof typeof RAW_LAYOUTS }> = [
 
 interface Bench {
   card: BaseSiCard;
-  /** Pages the transcript carries, block -> bytes. */
-  pages: Map<number, number[]>;
+  /** Blocks the card asked for and the mock station delivered, block -> bytes. */
+  delivered: Map<number, number[]>;
 }
 
 /** Read a bench transcript's card through a mock station that answers from the
  * transcript's `in` frames; a page it does not carry is an erased (0xEE) page,
- * like replay's legacyErasedPageReply. */
+ * like replay's legacyErasedPageReply. Records what it delivered, so the test
+ * follows the reader's block choice instead of the recording's. */
 const isIn = (list: readonly number[], c: number): boolean => list.includes(c);
 
 const readBench = async (slug: string): Promise<Bench> => {
@@ -59,13 +60,12 @@ const readBench = async (slug: string): Promise<Bench> => {
     isIn([proto.cmd.SI5_DET, proto.cmd.SI6_DET, proto.cmd.SI8_DET], m.command)
   )!;
   const card = BaseSiCard.detectFromMessage(det)!;
-  const pages = new Map<number, number[]>();
+  const delivered = new Map<number, number[]>();
   const replies = new Map<string, number[]>();
   for (const m of messages) {
     if (!isIn([proto.cmd.GET_SI5, proto.cmd.GET_SI6, proto.cmd.GET_SI8], m.command)) continue;
     const isSi5 = m.command === proto.cmd.GET_SI5;
     const block = isSi5 ? 0 : m.parameters[2]!;
-    pages.set(block, m.parameters.slice(isSi5 ? 2 : 3));
     replies.set(`${m.command}:${block}`, [m.command, m.parameters.length, ...m.parameters]);
   }
   card.mainStation = {
@@ -81,11 +81,12 @@ const readBench = async (slug: string): Promise<Bench> => {
         block,
         ...new Array<number>(RAW_BLOCK_SIZE).fill(0xee),
       ];
+      delivered.set(block, reply.slice(command === proto.cmd.GET_SI5 ? 4 : 5));
       return Promise.resolve([reply]);
     },
   };
   await card.read();
-  return { card, pages };
+  return { card, delivered };
 };
 
 const sameBytes = (a: Uint8Array, b: ArrayLike<number>): boolean =>
@@ -94,7 +95,7 @@ const sameBytes = (a: Uint8Array, b: ArrayLike<number>): boolean =>
 describe('rawPages snapshot equals the bench transcripts', () => {
   for (const { slug, type } of SLUGS) {
     test(`${slug}-bench-001`, async () => {
-      const { card, pages } = await readBench(slug);
+      const { card, delivered } = await readBench(slug);
       const raw = card.rawPages();
       assert.strictEqual(raw.cardType, type);
       assert.strictEqual(raw.layout, RAW_LAYOUTS[type].layout);
@@ -103,16 +104,14 @@ describe('rawPages snapshot equals the bench transcripts', () => {
         raw.blocks.map((b) => b.block),
         [...blocks.keys()].sort((a, b) => a - b)
       );
-      for (const [block, bytes] of pages) {
-        assert.ok(blocks.has(block), `block ${block} of the transcript is in the snapshot`);
-        assert.ok(sameBytes(blocks.get(block)!, bytes), `block ${block} bytes`);
+      // Exactly the blocks the reader asked for, with the bytes the station sent.
+      assert.deepStrictEqual(
+        [...blocks.keys()].sort((a, b) => a - b),
+        [...delivered.keys()].sort((a, b) => a - b)
+      );
+      for (const [block, bytes] of delivered) {
         assert.strictEqual(bytes.length, RAW_BLOCK_SIZE);
-      }
-      // Anything else was fetched by the reader and answered with an erased page.
-      for (const [block, bytes] of blocks) {
-        if (pages.has(block)) continue;
-        assert.ok([1, 3].includes(block), `unexpected extra block ${block}`);
-        assert.ok(Array.from(bytes).every((v) => v === 0xee));
+        assert.ok(sameBytes(blocks.get(block)!, bytes), `block ${block} bytes`);
       }
     });
   }
