@@ -20,6 +20,7 @@ import { EventEmitter } from 'node:events';
 
 import type { ISerialTransport } from '../transport/ISerialTransport.ts';
 import { SiMainStation } from '../SiStation/SiMainStation.ts';
+import type { UnsupportedCard } from '../SiStation/ISiMainStation.ts';
 import { NdjsonEmitter } from '../output/ndjson.ts';
 import type { BaseSiCard } from '../SiCard/BaseSiCard.ts';
 import { inferCardType } from '../SiCard/cardTypeFromNumber.ts';
@@ -308,6 +309,13 @@ export const replayFixture = async (
   station.on('cardRead', (card: BaseSiCard) => emitter.card_read({ card }));
   station.on('cardRemoved', (cardNumber: number) =>
     emitter.card_removed({ card_number: cardNumber })
+  );
+  station.on('cardUnsupported', (u: UnsupportedCard) =>
+    emitter.card_unsupported({
+      card_number: u.cardNumber,
+      detect_command: u.command,
+      ...(u.seriesByte !== undefined ? { card_series_byte: u.seriesByte } : {}),
+    })
   );
   station.on('frameError', (err: FrameError) => emitter.frame_error(err));
 

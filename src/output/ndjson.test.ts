@@ -170,6 +170,27 @@ describe('NdjsonEmitter', () => {
     assert.strictEqual(parsed.card_number, 12345);
   });
 
+  test('card_unsupported: emits number, detect command and series byte', () => {
+    setMockedClock();
+    const lines: string[] = [];
+    const emitter = new NdjsonEmitter({
+      device_path: '/dev/ttyUSB0',
+      out: (line) => lines.push(line),
+    });
+    emitter.card_unsupported({
+      card_number: 3500000,
+      detect_command: 0xe8,
+      card_series_byte: 0x0f,
+    });
+    emitter.card_unsupported({ card_number: 3500000, detect_command: 0xe5 });
+    const [a, b] = lines.map((l) => JSON.parse(l) as Record<string, unknown>);
+    assert.strictEqual(a!.event, 'card_unsupported');
+    assert.strictEqual(a!.card_number, 3500000);
+    assert.strictEqual(a!.detect_command, 0xe8);
+    assert.strictEqual(a!.card_series_byte, 0x0f);
+    assert.ok(!('card_series_byte' in b!));
+  });
+
   test('frame_error: consumes typed FrameError directly', () => {
     setMockedClock();
     const lines: string[] = [];

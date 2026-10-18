@@ -17,7 +17,11 @@ export { DeviceClosedError, NakError, SendTimeoutError } from './transport/error
 
 // --- Station ----------------------------------------------------------------
 export { SiMainStation } from './SiStation/SiMainStation.ts';
-export type { ConnectionState, ISiMainStation } from './SiStation/ISiMainStation.ts';
+export type {
+  ConnectionState,
+  ISiMainStation,
+  UnsupportedCard,
+} from './SiStation/ISiMainStation.ts';
 
 // --- Protocol primitives ----------------------------------------------------
 export {
@@ -70,6 +74,7 @@ export type {
   CardInsertedEvent,
   CardReadEvent,
   CardRemovedEvent,
+  CardUnsupportedEvent,
   FrameErrorEvent,
   NdjsonEmitterOpts,
 } from './output/ndjson.ts';

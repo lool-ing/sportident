@@ -1,8 +1,8 @@
 // Authored for lool. Not ported from upstream.
 //
 // NDJSON event emitter (output layer). Implements
-// the stable v1 schema — five event types (connection_changed, card_inserted,
-// card_read, card_removed, frame_error), all keys snake_case, all host
+// the stable v1 schema — six event types (connection_changed, card_inserted,
+// card_read, card_removed, card_unsupported, frame_error), all keys snake_case, all host
 // timestamps ms-epoch numbers, schema_version=1 locked on every event.
 //
 // Card-internal half-day clock fields stay raw `{seconds_in_half_day, half_day,
@@ -110,6 +110,14 @@ export interface CardRemovedEvent extends NdjsonBase {
   card_number: number;
 }
 
+export interface CardUnsupportedEvent extends NdjsonBase {
+  event: 'card_unsupported';
+  card_number: number;
+  /** The detect command byte: 0xE5 (SI5_DET), 0xE6 (SI6_DET) or 0xE8 (SI8_DET). */
+  detect_command: number;
+  card_series_byte?: number;
+}
+
 export interface FrameErrorEvent extends NdjsonBase {
   event: 'frame_error';
   error_code: FrameError['error_code'];
@@ -120,7 +128,12 @@ export interface FrameErrorEvent extends NdjsonBase {
 }
 
 export type NdjsonEvent =
-  ConnectionChangedEvent | CardInsertedEvent | CardReadEvent | CardRemovedEvent | FrameErrorEvent;
+  | ConnectionChangedEvent
+  | CardInsertedEvent
+  | CardReadEvent
+  | CardRemovedEvent
+  | CardUnsupportedEvent
+  | FrameErrorEvent;
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -337,6 +350,20 @@ export class NdjsonEmitter {
       ...this._base('card_removed'),
       card_number: payload.card_number,
     };
+    this._write(event);
+  }
+
+  card_unsupported(payload: {
+    card_number: number;
+    detect_command: number;
+    card_series_byte?: number;
+  }): void {
+    const event: CardUnsupportedEvent = {
+      ...this._base('card_unsupported'),
+      card_number: payload.card_number,
+      detect_command: payload.detect_command,
+    };
+    if (payload.card_series_byte !== undefined) event.card_series_byte = payload.card_series_byte;
     this._write(event);
   }
 

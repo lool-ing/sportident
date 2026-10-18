@@ -50,3 +50,22 @@ test('a failed card read and a transport error are reported; the next card is st
   station.emit('error', new DeviceClosedError('transport closed mid-flight'));
   assert.deepStrictEqual(shutdowns, [3]);
 });
+
+test('an unsupported card gives a card_unsupported line', () => {
+  const station = new EventEmitter();
+  const lines: string[] = [];
+  const emitter = new NdjsonEmitter({ device_path: '/dev/test', out: (l) => lines.push(l) });
+  wireReadout(
+    station as unknown as SiMainStation,
+    new EventEmitter() as unknown as ISerialTransport,
+    emitter,
+    { once: false },
+    async () => undefined
+  );
+  station.emit('cardUnsupported', { cardNumber: 3_500_000, command: 0xe8, seriesByte: 0x0f });
+  const e = JSON.parse(lines[0]!) as Record<string, unknown>;
+  assert.deepStrictEqual(
+    [e.event, e.card_number, e.detect_command, e.card_series_byte],
+    ['card_unsupported', 3_500_000, 0xe8, 0x0f]
+  );
+});

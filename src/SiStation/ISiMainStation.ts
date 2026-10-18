@@ -11,10 +11,19 @@ import type { ISiStation } from './ISiStation.ts';
 
 export type ConnectionState = 'opening' | 'open' | 'closed' | 'error';
 
+/** A card detection whose number no supported card type covers. Not read, not
+ * ACKed; `seriesByte` is SI8_DET's params[2]. */
+export interface UnsupportedCard {
+  cardNumber: number;
+  command: number;
+  seriesByte?: number;
+}
+
 export interface SiMainStationEvents {
   cardInserted: (card: BaseSiCard) => void;
   cardRead: (card: BaseSiCard) => void;
   cardRemoved: (cardNumber: number) => void;
+  cardUnsupported: (card: UnsupportedCard) => void;
   frameError: (err: FrameError) => void;
   connectionChanged: (state: ConnectionState) => void;
 }

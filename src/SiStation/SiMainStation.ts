@@ -236,7 +236,10 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
       if (card && card.cardNumber === this.readingCard?.cardNumber) return;
       this.ackedCardNumber = undefined;
       this._abortRead();
-      if (!card) return;
+      if (!card) {
+        this._emitUnsupported(message);
+        return;
+      }
       card.mainStation = {
         sendMessage: (msg, expected, timeout) => this._sendForCard(card, msg, expected, timeout),
       };
@@ -285,6 +288,21 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
       return;
     }
     // Other free-floating commands (autosend etc.) — Phase 4 territory.
+  }
+
+  /** A detection no registry takes: report it, send nothing. The number is
+   * decoded as detectFromMessage does; the series byte is SI8_DET's only. */
+  private _emitUnsupported(message: SiMessage): void {
+    if (message.mode !== undefined || message.parameters.length < 6) return;
+    const p = message.parameters;
+    const cardNumber = arr2cardNumber([p[5], p[4], p[3]]);
+    if (cardNumber === undefined) return;
+    const seriesByte = message.command === proto.cmd.SI8_DET ? p[2] : undefined;
+    this.emit('cardUnsupported', {
+      cardNumber,
+      command: message.command,
+      ...(seriesByte !== undefined ? { seriesByte } : {}),
+    });
   }
 
   /** A command of `card`'s read. A card that left the station sends nothing

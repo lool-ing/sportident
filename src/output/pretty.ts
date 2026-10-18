@@ -95,6 +95,8 @@ export const formatEvent = (e: NdjsonEvent): string => {
       return formatCardRead(e);
     case 'card_removed':
       return `${at}  card ${e.card_number} removed\n\n`;
+    case 'card_unsupported':
+      return `${at}  card ${e.card_number} is not a supported card type, not read\n`;
     case 'frame_error':
       return `${at}  frame error: ${e.error_code}\n`;
   }

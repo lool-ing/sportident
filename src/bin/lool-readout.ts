@@ -26,6 +26,7 @@
 
 import { SerialTransport } from '../transport/SerialTransport.ts';
 import { SiMainStation } from '../SiStation/SiMainStation.ts';
+import type { UnsupportedCard } from '../SiStation/ISiMainStation.ts';
 import type { ISerialTransport } from '../transport/ISerialTransport.ts';
 import { DeviceClosedError } from '../transport/errors.ts';
 import { NdjsonEmitter } from '../output/ndjson.ts';
@@ -216,6 +217,14 @@ export const wireReadout = (
   station.on('cardRemoved', (cardNumber: number) =>
     emitter.card_removed({ card_number: cardNumber })
   );
+  station.on('cardUnsupported', (u: UnsupportedCard) => {
+    emitter.card_unsupported({
+      card_number: u.cardNumber,
+      detect_command: u.command,
+      ...(u.seriesByte !== undefined ? { card_series_byte: u.seriesByte } : {}),
+    });
+    emitDiagnostic(`card ${u.cardNumber} is not a supported card type, not read`);
+  });
   station.on('frameError', (err: FrameError) => {
     emitter.frame_error(err);
     emitDiagnostic(

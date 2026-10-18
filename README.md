@@ -64,7 +64,9 @@ Other entry points, all exported from the package root:
   `--baud <38400|4800|auto>` (or `LOOL_BAUD`, default `38400`; some
   stations only answer at 4800, `auto` tries 38400 then 4800),
   `--pretty`, `--once`. `--record <name>` saves a wire transcript and
-  `--replay <name>` checks the decoder against one.
+  `--replay <name>` checks the decoder against one. A card number outside
+  the supported ranges is not read: it gives a `card_unsupported` event
+  (`card_number`, `detect_command`, `card_series_byte?`) and a stderr line.
 - `lool-trainer --course 31,32,33` checks each card against a course,
   for training without a competition system. Takes `--device` and
   `--baud` too.
