@@ -510,6 +510,14 @@ describe('SiMainStation: an incomplete frame while no request is pending', () =>
     assert.deepEqual(r.log, READ_A);
   });
 
+  test("noise whose fake length ends on the detection's ETX: the card is still read", async () => {
+    // 02 EF 09 claims 9 bytes, so its CRC and "ETX" are the end of DET_A.
+    const r = await deliver([{ ms: 0, bytes: [0x02, 0xef, 0x09, ...DET_A] }], 200);
+    assert.deepEqual(r.read, [a]);
+    assert.deepEqual(r.frameErrors, ['crc_mismatch']);
+    assert.deepEqual(r.log, READ_A);
+  });
+
   test('a detection in three slow deliveries (within the limit) is read at once', async () => {
     const r = await deliver(
       [

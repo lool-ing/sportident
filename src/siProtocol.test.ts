@@ -260,3 +260,29 @@ describe('parseAll: bad-CRC frame via FrameError callback', () => {
     assert.strictEqual(stderrSpy.mock.callCount(), 0);
   });
 });
+
+describe('parseAll: a bad-CRC frame that spans whole frames', () => {
+  test('noise whose fake length ends on a real ETX: the frames inside are still parsed', () => {
+    const det = (n: number): number[] =>
+      render({
+        command: 0xe8,
+        parameters: [0, 0x0a, 0x0f, (n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff],
+      });
+    // 02 EF F9 claims 249 bytes: its "ETX" is the last byte of the 21st DET.
+    const bytes = [
+      0x02,
+      0xef,
+      12 * 20 + 9,
+      ...Array.from({ length: 21 }, (_, k) => det(8_000_000 + k)).flat(),
+    ];
+    const errors: FrameError[] = [];
+    const { messages, remainder } = parseAll(bytes, { onFrameError: (e) => errors.push(e) });
+    assert.strictEqual(messages.length, 21);
+    assert.deepStrictEqual(
+      errors.map((e) => [e.error_code, e.bytes_consumed]),
+      [['crc_mismatch', 3]],
+      'only the noise is dropped'
+    );
+    assert.deepStrictEqual(remainder, []);
+  });
+});

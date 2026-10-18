@@ -318,7 +318,23 @@ export const parseAll = (
   const messages: SiMessage[] = [];
   let remainderWasShrinking = true;
   while (remainderWasShrinking) {
-    const result = parse(currentRemainder);
+    let result = parse(currentRemainder);
+    // A stray STX can make later, whole frames look like one bad frame's
+    // data: go on at the first whole frame inside it, as AutosendListener does.
+    if (result.badFrame?.code === 'crc_mismatch') {
+      const next = nextFrameStart(currentRemainder);
+      if (next > 0 && next < result.badFrame.bytesConsumed) {
+        result = {
+          message: null,
+          remainder: currentRemainder.slice(next),
+          badFrame: {
+            ...result.badFrame,
+            rawBytes: currentRemainder.slice(0, next),
+            bytesConsumed: next,
+          },
+        };
+      }
+    }
     remainderWasShrinking = result.remainder.length < currentRemainder.length;
     if (result.badFrame && opts.onFrameError) {
       const bf = result.badFrame;
