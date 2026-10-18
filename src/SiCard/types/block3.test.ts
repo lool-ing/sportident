@@ -54,7 +54,7 @@ async function read<T extends SIAC | SiCard10>(
 
 describe('SIAC block 3: battery and versions', () => {
   test('SIAC reads page 3 right after page 0; SI10 does not read it', async () => {
-    assert.deepEqual((await read(SIAC, makeMemory())).pages, [0, 3]);
+    assert.deepEqual((await read(SIAC, makeMemory())).pages, [0, 3, 1]);
     assert.deepEqual((await read(SiCard10, makeMemory())).pages, [0]);
   });
 

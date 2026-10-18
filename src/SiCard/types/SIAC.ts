@@ -18,6 +18,12 @@ import { ModernSiCard } from './ModernSiCard.ts';
 
 export class SIAC extends ModernSiCard {
   static override readsBlock3 = true;
+
+  /** Always read block 1 on SIAC (SPORTident (Thomas, 2026-10-13), answer 12),
+   * whatever the records and firmware; its codes are only used on 4.0+. */
+  override typeSpecificReadCodeBlock(): Promise<void> {
+    return this.block1Read ? Promise.resolve() : this.readBlock1();
+  }
 }
 
 BaseSiCard.registerSi8Range(8_000_000, 9_000_000, SIAC);
