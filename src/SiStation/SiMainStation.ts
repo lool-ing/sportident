@@ -199,8 +199,11 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
       const card = BaseSiCard.detectFromMessage(message);
       if (!card) return;
       card.mainStation = {
+        // A card that left the station sends nothing more.
         sendMessage: (msg, expected, timeout) =>
-          this.multiplexer.sendMessage(msg, expected, timeout),
+          this.readingCard === card
+            ? this.multiplexer.sendMessage(msg, expected, timeout)
+            : Promise.reject(new Error('card removed during read')),
       };
       this.emit('cardInserted', card);
       this.readingCard = card;
@@ -216,12 +219,16 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
       // (cardInserted -> [card data on wire] -> [ACK on wire] -> cardRead).
       card
         .read()
-        .finally(() => {
-          if (this.readingCard === card) this.readingCard = undefined;
+        .then(() => {
+          // All pages came before the card left: report it, but no ACK, since
+          // the station may already hold the next card.
+          if (this.readingCard !== card) return;
+          this.readingCard = undefined;
+          return this.multiplexer.sendBareAck();
         })
-        .then(() => this.multiplexer.sendBareAck())
         .then(() => this.emit('cardRead', card))
         .catch((err: Error) => {
+          if (this.readingCard === card) this.readingCard = undefined;
           // Forward as a frameError so subscribers see the failure.
           const fe: FrameError = {
             error_code: 'crc_mismatch',
@@ -243,6 +250,7 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
    * its read now, so no reply meant for the next card is taken as its data. */
   private _abortRead(): void {
     if (this.readingCard) {
+      this.readingCard = undefined;
       this.multiplexer._abortAllPendingSends('', new Error('card removed during read'));
     }
   }
