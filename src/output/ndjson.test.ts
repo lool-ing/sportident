@@ -19,7 +19,7 @@ import { describe, test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { FrameError } from '../siProtocol.ts';
-import { SiCard5 } from '../SiCard/types/SiCard5.ts';
+import { SiCard5, getPunchOffset } from '../SiCard/types/SiCard5.ts';
 import { SiCard10 } from '../SiCard/types/SiCard10.ts';
 import { fixture as si5Fixture } from '../../tests/fixtures/upstream/si5-16-punches.ts';
 import { fixture as si10Fixture } from '../../tests/fixtures/upstream/si10-typical.ts';
@@ -124,6 +124,32 @@ describe('NdjsonEmitter', () => {
     assert.strictEqual(punches[0]!.seconds_in_half_day, 7967);
     assert.strictEqual(punches[0]!.half_day, 0);
     assert.strictEqual(punches[0]!.weekday, null); // SI5 doesn't store weekday
+  });
+
+  test('card_read: SI5 code-only punches (slots 31-36) have null time, a real 00:00:00 punch stays 0', () => {
+    setMockedClock();
+    const bytes = new Array<number>(0x80).fill(0);
+    for (let i = 0; i < 36; i++) bytes[getPunchOffset(i)] = 101 + i; // code; time bytes stay 0
+    const card = new SiCard5(7050892);
+    card._decodeFromStorage(bytes);
+
+    const lines: string[] = [];
+    new NdjsonEmitter({ device_path: '/dev/ttyUSB0', out: (line) => lines.push(line) }).card_read({
+      card,
+    });
+    const punches = (JSON.parse(lines[0]!) as { punches: Array<Record<string, unknown>> }).punches;
+    assert.strictEqual(punches.length, 36);
+    assert.deepStrictEqual(punches[0], {
+      code: 101,
+      seconds_in_half_day: 0,
+      half_day: 0,
+      weekday: null,
+    });
+    for (const p of punches.slice(30)) {
+      assert.strictEqual(p.seconds_in_half_day, null);
+      assert.strictEqual(p.half_day, null);
+      assert.strictEqual(p.weekday, null);
+    }
   });
 
   test('card_read: SI10 from fixture has uid + start + punch_count=16', () => {

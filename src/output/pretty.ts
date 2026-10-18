@@ -12,7 +12,9 @@ const HALF_DAY = 43200;
 const DAY = 86400;
 
 const toSeconds = (c: HalfDayClock | NdjsonPunch | null): number | null =>
-  c ? c.half_day * HALF_DAY + c.seconds_in_half_day : null;
+  c && c.half_day !== null && c.seconds_in_half_day !== null
+    ? c.half_day * HALF_DAY + c.seconds_in_half_day
+    : null;
 
 const pad2 = (n: number): string => String(n).padStart(2, '0');
 
@@ -38,11 +40,11 @@ const wallClock = (ts_ms: number): string => new Date(ts_ms).toTimeString().slic
 const formatCardRead = (e: Extract<NdjsonEvent, { event: 'card_read' }>): string => {
   // Collapse back-to-back punches on the same control (SIAC double-punching)
   // into one row; the first punch's time counts.
-  const visits: { code: number; time: number; count: number }[] = [];
+  const visits: { code: number; time: number | null; count: number }[] = [];
   for (const p of e.punches) {
     const last = visits.at(-1);
     if (last && last.code === p.code) last.count++;
-    else visits.push({ code: p.code, time: toSeconds(p) as number, count: 1 });
+    else visits.push({ code: p.code, time: toSeconds(p), count: 1 });
   }
 
   const period = e.card_type === 'SI5' ? HALF_DAY : DAY;

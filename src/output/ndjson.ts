@@ -72,8 +72,9 @@ export interface HalfDayClock {
 
 export interface NdjsonPunch {
   code: number;
-  seconds_in_half_day: number;
-  half_day: 0 | 1;
+  /** null (with `half_day`): the card stores a code but no time (SI5 slots 31-36). */
+  seconds_in_half_day: number | null;
+  half_day: 0 | 1 | null;
   weekday: number | null;
 }
 
@@ -282,11 +283,9 @@ export class NdjsonEmitter {
       const clock = toHalfDayClock(p.time);
       return {
         code: p.code,
-        // toHalfDayClock returned non-null because `time` came from a stored
-        // punch which is always numeric here. Falling back to {0,0,null} if
-        // somehow null preserves shape stability for downstream parsers.
-        seconds_in_half_day: clock?.seconds_in_half_day ?? 0,
-        half_day: clock?.half_day ?? 0,
+        // A missing time stays null so a code-only punch differs from 00:00:00.
+        seconds_in_half_day: clock?.seconds_in_half_day ?? null,
+        half_day: clock?.half_day ?? null,
         weekday: clock?.weekday ?? null,
       };
     });
