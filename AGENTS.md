@@ -41,6 +41,12 @@ patch; while the major is 0 a breaking change bumps the minor, from 1.0.0
 the major. `docs`, `test`, `chore`, `ci`, `build` and `style` stay out of
 the changelog.
 
+A change to what a decoder outputs is a `fix:` (or `feat:`), so it bumps the
+next release's version; the version is set at release, not per commit.
+Between releases the package reports the last release's version. Consumers
+that store the version with each read, to find reads from a buggy decoder,
+use a release from npm, not a git-linked build.
+
 1. On a branch from `main`: `pnpm release:version` prints the next version.
 2. `pnpm changelog` adds that version's section at the top of
    `CHANGELOG.md`. Rewrite it for users: merge fix-of-a-fix entries, say
