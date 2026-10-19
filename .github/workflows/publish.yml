@@ -37,7 +37,20 @@ jobs:
             echo "::error::CHANGELOG.md has no dated section '## [$version] - YYYY-MM-DD'"
             exit 1
           fi
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - run: pnpm test
-      - run: npm publish --provenance --access public
+      # A version published by hand (the first release) or a re-run tag: skip.
+      - name: Skip a version that is already on npm
+        id: npm
+        run: |
+          spec="$(node -p "require('./package.json').name")@$(node -p "require('./package.json').version")"
+          if npm view "$spec" version >/dev/null 2>&1; then
+            echo "::notice::$spec is already on npm; nothing to publish"
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.npm.outputs.published != 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.npm.outputs.published != 'true'
+        run: pnpm build
+      - if: steps.npm.outputs.published != 'true'
+        run: pnpm test
+      - if: steps.npm.outputs.published != 'true'
+        run: npm publish --provenance --access public
