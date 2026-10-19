@@ -33,7 +33,11 @@ First release.
 - The punch day of week (`weekdayRaw`, 0-7) on modern cards and SI6, and
   `dayOfWeekFromRaw`.
 - Raw pages of each read (`card.rawPages()`) and the card address ranges that
-  hold personal data (`RAW_LAYOUTS`).
+  hold personal data (`RAW_LAYOUTS`), for every card type including SI6 (its
+  owner's programmed start number counts as personal data).
+- `decodeRawPages(raw)` decodes stored raw pages again with the same decoder,
+  and rejects a malformed `RawPages`. `VERSION` is the package version, to
+  store with each read.
 - `NdjsonEmitter`: one JSON object per line for `connection_changed`,
   `card_inserted`, `card_read`, `card_removed`, `card_unsupported` and
   `frame_error`. A punch with a code but no valid time has
