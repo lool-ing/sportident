@@ -5,9 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0] - unreleased
+## [0.1.0] - 2026-10-19
 
-First release.
+First release. The readout changes (retries, pulled and swapped cards,
+repeated detections, resync after line noise) are tested against recorded and
+synthetic station traffic but not yet against a real station; do not rely on
+this version at a competition before that.
 
 ### Added
 
