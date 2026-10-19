@@ -34,10 +34,6 @@ the file headers below.
 
 ## Rules that are easy to break
 
-- **Decoding changes bump the version.** Any change to what a decoder
-  outputs bumps `version` in `package.json` (patch at least): consumers
-  store `VERSION` with every read to find the reads made by a buggy
-  decoder.
 - **File headers.** A new file starts with
   `// Authored for lool. Not ported from upstream.`, or, when it is
   ported, with the header of the code it came from
