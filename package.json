@@ -50,6 +50,8 @@
     "test:watch": "node --test --watch --test-reporter=spec 'src/**/*.test.ts'",
     "lint": "eslint src && bash scripts/check-mit-attribution.sh",
     "typecheck": "tsc --noEmit",
+    "changelog": "git-cliff --bump --unreleased --prepend CHANGELOG.md",
+    "release:version": "git-cliff --bumped-version",
     "prepare": "lefthook install"
   },
   "dependencies": {
@@ -61,6 +63,7 @@
     "@eslint/js": "^10.0.1",
     "@types/node": "^26.6.4",
     "eslint": "^10.12.0",
+    "git-cliff": "^2.14.2",
     "globals": "^17.13.0",
     "lefthook": "^2.2.1",
     "prettier": "^3.9.9",
