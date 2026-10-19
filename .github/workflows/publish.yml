@@ -1,6 +1,8 @@
 # Publishes to npm on a version tag (v0.1.0, ...). No NPM_TOKEN: npm
 # Trusted Publishing authenticates this workflow through OIDC, and
-# --provenance links the package to this build.
+# --provenance links the package to this build. It stops before building
+# unless the tag is v<package.json version> and CHANGELOG.md has that
+# version's dated section.
 
 name: publish
 on:
@@ -24,6 +26,17 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
           registry-url: https://registry.npmjs.org
+      - name: Tag, package.json and CHANGELOG.md agree
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match package.json version $version"
+            exit 1
+          fi
+          if ! grep -Eq "^## \[${version//./\\.}\] - [0-9]{4}-[0-9]{2}-[0-9]{2}$" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no dated section '## [$version] - YYYY-MM-DD'"
+            exit 1
+          fi
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm test

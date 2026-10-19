@@ -55,8 +55,9 @@ use a release from npm, not a git-linked build.
    the bottom (`[x.y.z]: https://github.com/lool-ing/sportident/compare/vA...vB`).
 3. Set `version` in `package.json` to the same version.
 4. Open a PR `chore(release): x.y.z`. After it is merged, tag the merge
-   commit `vx.y.z` and push the tag: the publish workflow builds, tests
-   and publishes to npm.
+   commit `vx.y.z` and push the tag: the publish workflow checks that the
+   tag, `package.json` and a dated `CHANGELOG.md` section agree, then builds,
+   tests and publishes to npm.
 
 ## Rules that are easy to break
 
