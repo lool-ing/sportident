@@ -457,7 +457,8 @@ describe('decodeRawPages', () => {
       })),
     });
     assert.strictEqual(card.punchCount, 3);
-    assert.ok((card.raceResult.punches?.length ?? 3) < 3);
+    assert.ok(card.raceResult.punches, 'punches decoded');
+    assert.ok(card.raceResult.punches.length < 3, 'decoder stopped before punchCount');
   });
 });
 
