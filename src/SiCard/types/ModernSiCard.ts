@@ -249,7 +249,6 @@ export abstract class ModernSiCard extends BaseSiCard {
   static readsBlock3 = false;
 
   public storage: SiStorage<IModernSiCardStorageFields>;
-  public punchCount?: number;
   public cardSeries?: ModernSiCardSeriesKey;
   public uid?: number;
   protected block1Read = false;

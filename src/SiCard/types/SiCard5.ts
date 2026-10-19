@@ -91,7 +91,6 @@ export class SiCard5 extends BaseSiCard {
 
   readonly cardType = 'SI5' as const;
   public storage: SiStorage<ISiCard5StorageFields>;
-  public punchCount?: number;
   public softwareVersion?: number;
 
   constructor(cardNumber: number) {

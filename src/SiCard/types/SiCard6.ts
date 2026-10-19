@@ -112,7 +112,6 @@ export class SiCard6 extends BaseSiCard {
 
   readonly cardType = 'SI6' as const;
   public storage: SiStorage<ISiCard6StorageFields>;
-  public punchCount?: number;
 
   constructor(cardNumber: number) {
     super(cardNumber);

@@ -380,9 +380,11 @@ describe('decodeRawPages', () => {
     );
   });
 
-  test('decodeFromStorage is a typed method on BaseSiCard', () => {
-    const card: BaseSiCard = new SiCard5(0);
-    card.decodeFromStorage(new Array<number>(0x80).fill(0xee));
+  test('decodeFromStorage is a typed method on BaseSiCard', async () => {
+    const { card } = await readBench('si8');
+    const typed: BaseSiCard = new SiCard8(0);
+    typed.decodeFromStorage(toImage(card.rawPages()));
+    assert.deepStrictEqual(typed.raceResult, card.raceResult);
   });
 
   test('rejects a block that is not 128 bytes', () => {
@@ -395,6 +397,49 @@ describe('decodeRawPages', () => {
         }),
       /block 0 has 64 bytes/
     );
+  });
+
+  test('rejects input that is not RawPages-shaped', () => {
+    const base = { cardType: 'SI8', layout: 'si8' } as const;
+    // an NDJSON block passed as is
+    assert.throws(
+      () => decodeRawPages({ ...base, blocks: [{ block: 0, b64: 'AAAA' }] } as unknown as RawPages),
+      /Uint8Array/
+    );
+    assert.throws(() => decodeRawPages(base as unknown as RawPages), /blocks must be an array/);
+    // number[] with a value that does not fit a byte
+    const numbers = new Array<number>(RAW_BLOCK_SIZE).fill(0);
+    numbers[0] = 300;
+    assert.throws(
+      () =>
+        decodeRawPages({ ...base, blocks: [{ block: 0, bytes: numbers }] } as unknown as RawPages),
+      /Uint8Array/
+    );
+  });
+
+  test('rejects a missing punch block instead of returning no punches', () => {
+    const page = (set: (b: Uint8Array) => void): Uint8Array => {
+      const b = new Uint8Array(RAW_BLOCK_SIZE);
+      set(b);
+      return b;
+    };
+    const cases: Array<[RawPages['cardType'], RawPages['layout'], number, number]> = [
+      ['SI6', 'si6', 0x12, 6],
+      ['SI8', 'si8', 0x16, 1],
+      ['SI10', 'modern', 0x16, 4],
+      ['SIAC', 'modern', 0x16, 4],
+    ];
+    for (const [cardType, layout, countAt, punchBlock] of cases) {
+      const block0 = page((b) => (b[countAt] = 2));
+      const withoutPunches = { cardType, layout, blocks: [{ block: 0, bytes: block0 }] };
+      assert.throws(() => decodeRawPages(withoutPunches), /punch/, cardType);
+      // no punches on the card: block 0 alone is complete
+      const none = page(() => {});
+      assert.doesNotThrow(() =>
+        decodeRawPages({ cardType, layout, blocks: [{ block: 0, bytes: none }] })
+      );
+      assert.ok(punchBlock > 0);
+    }
   });
 });
 

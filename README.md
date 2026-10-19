@@ -74,13 +74,22 @@ as `raw_pages: { layout, blocks: [{ block, b64 }] }`.
 
 `decodeRawPages(raw)` runs the same decoder on a `RawPages` (for example a
 sanitised copy) and returns the card, with the card number taken from the
-bytes and unlisted blocks left unread. It throws on an unknown `cardType` or
-a block that is not 128 bytes. `VERSION` is the library version.
+bytes and unlisted blocks left unread. To build a `RawPages` from a
+`raw_pages` NDJSON line, take `card_type` as `cardType` and turn each
+`b64` into `bytes` with `Buffer.from(b64, 'base64')`. `VERSION` is the
+library version.
+
+It throws "malformed RawPages" when the `cardType` is unknown, the `layout`
+does not match it, a `block` is not a whole number within the card or is
+repeated, block 0 is missing, or `bytes` is not a 128-byte `Uint8Array`. It
+also throws when the listed blocks do not cover the punches the card's
+`punchCount` says exist (SI6, SI8, SI9, SI10, SI11, SIAC keep punches in
+blocks of their own), instead of returning fewer punches.
 
 ```ts
 import { decodeRawPages, VERSION } from '@lool-ing/sportident';
 
-const { raceResult } = decodeRawPages(sanitised); // raceResult.punchCount, ...
+const card = decodeRawPages(sanitised); // card.raceResult.punches, card.punchCount, ...
 ```
 
 The library does not sanitise. `RAW_LAYOUTS[cardType].personal` lists the

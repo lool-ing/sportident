@@ -121,13 +121,15 @@ export abstract class BaseSiCard {
    * cards (no series byte) and for cards instantiated directly via
    * `decodeFromStorage` in tests. */
   public cardSeriesByte?: number;
+  /** Punches the card says it holds; set once decoded. */
+  public punchCount?: number;
   /** Set by the class the detection command picked, not inferred from the number. */
   abstract readonly cardType: CardType;
   abstract readonly storage: { readonly data: ReadonlyArray<number | undefined> };
 
   /** Splice raw card bytes (address = index; `undefined` = never read) into
    * storage and decode them, without a station. Supported API: `decodeRawPages`
-   * and consumers depend on it, so changing what it decodes needs a version bump. */
+   * and consumers depend on it. */
   abstract decodeFromStorage(storageBytes: (number | undefined)[]): void;
 
   constructor(cardNumber: number) {
