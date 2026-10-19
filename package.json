@@ -52,7 +52,8 @@
     "typecheck": "tsc --noEmit",
     "changelog": "git-cliff --bump --unreleased --prepend CHANGELOG.md",
     "release:version": "git-cliff --bumped-version",
-    "prepare": "lefthook install"
+    "prepare": "lefthook install",
+    "prepublishOnly": "pnpm build"
   },
   "dependencies": {
     "serialport": "^13.0.0"
