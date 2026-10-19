@@ -82,9 +82,10 @@ library version.
 It throws "malformed RawPages" when the `cardType` is unknown, the `layout`
 does not match it, a `block` is not a whole number within the card or is
 repeated, block 0 is missing, or `bytes` is not a 128-byte `Uint8Array`. It
-also throws when the listed blocks do not cover the punches the card's
-`punchCount` says exist (SI6, SI8, SI9, SI10, SI11, SIAC keep punches in
-blocks of their own), instead of returning fewer punches.
+also throws when a block that holds one of the punch slots `punchCount` says
+exist (SI6, SI8, SI9, SI10, SI11, SIAC keep punches in blocks of their own)
+is not listed. If all those blocks are present it does not throw, even when
+the decoder stops early at an invalid slot and returns fewer punches.
 
 ```ts
 import { decodeRawPages, VERSION } from '@lool-ing/sportident';

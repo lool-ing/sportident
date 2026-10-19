@@ -441,6 +441,24 @@ describe('decodeRawPages', () => {
       assert.ok(punchBlock > 0);
     }
   });
+
+  test('all punch blocks present decodes even when the decoder stops at an invalid slot', () => {
+    const img = new Array<number>(0x100).fill(0);
+    img[0x16] = 3;
+    img.fill(0xee, 0x88 + 4, 0x88 + 8); // slot 1 invalid, slot 2 valid
+    img.splice(0x88, 4, 0x1f, 0x00, 0x10, 0x20);
+    img.splice(0x88 + 8, 4, 0x20, 0x00, 0x11, 0x21);
+    const card = decodeRawPages({
+      cardType: 'SI8',
+      layout: 'si8',
+      blocks: [0, 1].map((block) => ({
+        block,
+        bytes: Uint8Array.from(img.slice(block * RAW_BLOCK_SIZE, (block + 1) * RAW_BLOCK_SIZE)),
+      })),
+    });
+    assert.strictEqual(card.punchCount, 3);
+    assert.ok((card.raceResult.punches?.length ?? 3) < 3);
+  });
 });
 
 test('VERSION equals package.json', () => {
