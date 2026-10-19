@@ -285,16 +285,18 @@ describe('personal-data ranges leave the race fields alone', () => {
     // finish, start, check and clear records: [ptd, code, time_hi, time_lo]
     img.splice(0x14, 12, 0x01, 0x20, 0x11, 0x00, 0x01, 0x1f, 0x10, 0x00, 0x01, 0x05, 0x0f, 0x00);
     img.splice(0x20, 4, 0x01, 0x00, 0x0e, 0x00);
-    for (let a = 0x30; a <= 0xfb; a++) img[a] = 0x41 + (a % 26); // holder text
     img.splice(0x300, 8, 0x01, 0x1f, 0x10, 0x20, 0x01, 0x20, 0x10, 0x30);
-    const a = race('SI6', fill(img, 'SI6', random));
+    const withHolder = img.slice();
+    for (let a = 0x30; a <= 0xfb; a++) withHolder[a] = 0x41 + (a % 26); // holder text
+    const a = race('SI6', withHolder);
     assert.deepStrictEqual(
       a,
       race(
         'SI6',
-        fill(img, 'SI6', () => 0)
+        fill(withHolder, 'SI6', () => 0)
       )
     );
+    assert.deepStrictEqual(a, race('SI6', fill(withHolder, 'SI6', random)));
     const result = (a as { result: Record<string, unknown> }).result;
     assert.strictEqual((result.punches as unknown[]).length, 2);
     for (const k of ['startTime', 'finishTime', 'checkTime', 'clearTime'])

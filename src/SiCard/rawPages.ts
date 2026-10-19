@@ -35,8 +35,9 @@ export interface PersonalRange {
 
 export interface RawLayout {
   layout: RawLayoutName;
-  /** False when the personal-data ranges are not known: `personal` is then
-   * empty and must not be read as "no personal data". */
+  /** True for every current layout. A future layout whose ranges are not
+   * known would set it false with `personal` empty, which must not be read as
+   * "no personal data". */
   personalRangesVerified: boolean;
   personal: PersonalRange[];
 }
@@ -44,10 +45,11 @@ export interface RawLayout {
 const holder = (from: number, to: number): PersonalRange => ({ kind: 'holder', from, to });
 const uid: PersonalRange = { kind: 'uid', from: 0x00, to: 0x03 };
 
-// Offsets from the decoders: SiCard5 cardHolder 0x01-0x03; SiCard8 cardHolder
-// 0x20 + 0x60 bytes; SiCard9 0x20 + 0x18; ModernSiCard cardHolder 0x20 + 0x80;
-// uid 0x00-0x03 on SI8, SI9 and modern cards. The race fields next to them
-// (card number 0x19-0x1B, SI8 punches from 0x88, SI9 from 0x38, modern punches from block 4, SIAC codes at 0xA4-0xA9) are outside.
+// Ranges follow SPORTident's card data structure document and may be wider
+// than what a decoder reads (SI8 owner area runs to 0x87, the decoder reads
+// 0x20 + 0x60): do not shrink them to decoder offsets. The race fields next
+// to them (card number 0x19-0x1B, SI8 punches from 0x88, SI9 from 0x38,
+// modern punches from block 4, SIAC codes at 0xA4-0xA9) are outside.
 const modern: RawLayout = {
   layout: 'modern',
   personalRangesVerified: true,

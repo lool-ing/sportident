@@ -84,10 +84,12 @@ personal data, so a consumer can blank them before storing:
 | SI9              | 0x20-0x37            | 0x00-0x03 |
 | SI10, SI11, SIAC | 0x20-0x9F            | 0x00-0x03 |
 
-SI6 keeps the owner's programmed start number, name, country and club in block 0 and the rest
-(phone, e-mail, address, birth date) in block 1, which the reader never
-fetches; both ranges are listed. SI6 has no chip serial. The ranges are
-tested not to overlap any decoded race field (times, codes, punches,
+SI6 keeps the owner's programmed start number, name, country and club in
+block 0 and the rest (phone, e-mail, address, birth date) in block 1, which
+the reader never fetches; both ranges are listed. SI6 has no chip serial. A
+personal range can cover a block the reader did not fetch (SI8 0x80-0x87 is
+in block 1, which a card without punches never reads), so consumers blank
+only the bytes of blocks they have. The ranges are tested not to overlap any decoded race field (times, codes, punches,
 subseconds, SIAC reserve records and block-1 codes).
 
 ## Command line
