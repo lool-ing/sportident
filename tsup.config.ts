@@ -1,6 +1,9 @@
 import { defineConfig } from 'tsup';
 
+import pkg from './package.json' with { type: 'json' };
+
 export default defineConfig({
+  define: { __LOOL_VERSION__: JSON.stringify(pkg.version) },
   entry: ['src/index.ts', 'src/bin/lool-readout.ts', 'src/bin/lool-trainer.ts'],
   format: ['esm', 'cjs'],
   // TypeScript 6 deprecates baseUrl, and tsup 8.5.1 (the last release)

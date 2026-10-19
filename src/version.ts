@@ -1,8 +1,17 @@
 // Authored for lool. Not ported from upstream.
 //
-// The package version, read from package.json so it cannot drift. tsup
-// inlines the JSON into the bundle.
+// The package version. tsup inlines it at build time (`define` in
+// tsup.config.ts); unbundled, as in the tests, it is read from package.json.
 
-import pkg from '../package.json' with { type: 'json' };
+import { readFileSync } from 'node:fs';
 
-export const VERSION: string = pkg.version;
+declare const __LOOL_VERSION__: string | undefined;
+
+export const VERSION: string =
+  typeof __LOOL_VERSION__ === 'string'
+    ? __LOOL_VERSION__
+    : (
+        JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
+          version: string;
+        }
+      ).version;
