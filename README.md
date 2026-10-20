@@ -128,7 +128,10 @@ On a card in it asks for the minimal readout, emits `cardRead` once per
 insertion and plays the reader's OK feedback. A card out before the reply
 drops the read. The readout carries decoded punches, not raw pages; store
 `readout.bytes` and decode them again with `decodeReadout`. `toRaceResult`
-gives the same fields as a serial card's `raceResult`.
+gives the same fields as a serial card's `raceResult`. For a SIAC the client
+asks for the complete readout to get its battery voltage, versions and
+battery date (`readout.battery`); the owner data in it is zeroed in
+`readout.bytes` and never decoded.
 
 ## Command line
 

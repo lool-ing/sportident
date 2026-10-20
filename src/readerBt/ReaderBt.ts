@@ -10,6 +10,7 @@ import {
   decodeReadout,
   encodeMessage,
   FEEDBACK,
+  isSiacNumber,
   READER_BT_MSG,
   READER_BT_UUID,
   Reassembler,
@@ -36,7 +37,8 @@ export interface ReaderBtEvents {
 type Listeners = { [E in keyof ReaderBtEvents]: Set<ReaderBtEvents[E]> };
 
 /**
- * Pull model: on a card in, request the minimal readout; on its reply, emit
+ * Pull model: on a card in, request the readout (complete for a SIAC, for its
+ * battery data, with the owner data zeroed; minimal otherwise); on its reply, emit
  * cardRead and play the OK feedback (in readout mode the reader plays none
  * itself). A card out before the reply drops the read: a later reply for that
  * card is ignored and gets no feedback. One read per insertion.
@@ -115,7 +117,14 @@ export class ReaderBt {
     this.read = undefined;
     this.emit('cardInserted', cardNumber);
     this.link
-      .write(READER_BT_UUID.cardData, encodeMessage(READER_BT_MSG.cardReadoutMinimal))
+      .write(
+        READER_BT_UUID.cardData,
+        encodeMessage(
+          isSiacNumber(cardNumber)
+            ? READER_BT_MSG.cardReadoutComplete
+            : READER_BT_MSG.cardReadoutMinimal
+        )
+      )
       .catch((err: Error) => {
         if (this.reading === cardNumber) this.reading = undefined;
         this.emit('error', err);

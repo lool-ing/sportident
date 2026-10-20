@@ -20,6 +20,7 @@ export const READER_BT_UUID = {
 export const READER_BT_MSG = {
   cardStateChange: 0x1101,
   cardReadoutMinimal: 0x1102,
+  cardReadoutComplete: 0x1103,
   feedback: 0x1110,
   segment: 0xa101,
 } as const;
@@ -180,25 +181,74 @@ export interface ReaderBtReadout {
   /** 1 SI-Card 9, 2 SI-Card 8, 4 SI-pCard, 15 SIAC; other values are kept as sent. */
   cardFamily: number;
   punches: ReaderBtPunch[];
+  /** SIAC only, from the complete readout: the values the serial read takes
+   * from block 3. */
+  battery?: SiacBattery;
   /** The whole message: store it as the evidence of the read and decode it
-   * again with decodeReadout (a Reader BT read has no raw card pages). */
+   * again with decodeReadout (a Reader BT read has no raw card pages). The
+   * owner data of a complete readout is zeroed. */
   bytes: Uint8Array;
 }
 
-/** Decodes a whole minimal readout message (0x1102), header included. */
+export interface SiacBattery {
+  /** As the reader sends it; absent above 5 V, as on the serial read. */
+  batteryMillivolts?: number;
+  /** "major.minor". */
+  hardwareVersion: string;
+  softwareVersion: string;
+  /** "YYYY-MM-DD"; absent when not a date or after this year. */
+  batteryDate?: string;
+}
+
+/** Card numbers of SIAC, the only cards whose complete readout carries battery data. */
+export const isSiacNumber = (cardNumber: number): boolean =>
+  cardNumber >= 8_000_000 && cardNumber < 9_000_000;
+
+const SIAC_DATA_SIZE = 13;
+
+/** Same rule as the serial siBatteryDate (ModernSiCard.ts). */
+const batteryDate = (yy: number, mm: number, dd: number): string | undefined => {
+  const year = 2000 + yy;
+  const d = new Date(Date.UTC(year, mm - 1, dd));
+  if (year > new Date().getFullYear() || d.getUTCMonth() !== mm - 1 || d.getUTCDate() !== dd)
+    return undefined;
+  return d.toISOString().slice(0, 10);
+};
+
+const decodeBattery = (v: DataView, at: number): SiacBattery => {
+  const version = (raw: number) => `${Math.floor(raw / 10)}.${raw % 10}`;
+  const mv = v.getUint16(at + 6, true);
+  const date = batteryDate(v.getUint8(at + 8), v.getUint8(at + 9), v.getUint8(at + 10));
+  return {
+    ...(mv <= 5000 && { batteryMillivolts: mv }),
+    hardwareVersion: version(v.getUint8(at)),
+    softwareVersion: version(v.getUint8(at + 1)),
+    ...(date !== undefined && { batteryDate: date }),
+  };
+};
+
+/**
+ * Decodes a whole readout message, header included: minimal (0x1102) or
+ * complete (0x1103). Of the complete readout only the SIAC battery data is
+ * decoded; the owner data after it is personal and is zeroed in `bytes`.
+ */
 export const decodeReadout = (bytes: Uint8Array): ReaderBtReadout => {
   const { id, payload } = splitMessage(bytes);
-  if (id !== READER_BT_MSG.cardReadoutMinimal) {
-    throw new ReaderBtDecodeError(`message 0x${id.toString(16)} is not a minimal readout`);
+  const complete = id === READER_BT_MSG.cardReadoutComplete;
+  if (id !== READER_BT_MSG.cardReadoutMinimal && !complete) {
+    throw new ReaderBtDecodeError(`message 0x${id.toString(16)} is not a card readout`);
   }
   if (payload.length < 7) throw new ReaderBtDecodeError(`readout of ${payload.length} bytes`);
   const v = view(payload);
+  const cardNumber = v.getUint32(0, true);
+  const cardFamily = v.getUint8(4);
   const count = v.getUint16(5, true);
-  if (payload.length !== 7 + count * PUNCH_SIZE) {
+  const end = 7 + count * PUNCH_SIZE;
+  if (complete ? payload.length < end : payload.length !== end) {
     throw new ReaderBtDecodeError(`${count} punches do not fit ${payload.length} bytes`);
   }
   const punches: ReaderBtPunch[] = [];
-  for (let at = 7; at < payload.length; at += PUNCH_SIZE) {
+  for (let at = 7; at < end; at += PUNCH_SIZE) {
     punches.push({
       controlInfo: v.getUint8(at),
       type: v.getUint8(at + 1),
@@ -206,12 +256,15 @@ export const decodeReadout = (bytes: Uint8Array): ReaderBtReadout => {
       timeMs: v.getUint32(at + 4, true),
     });
   }
-  return {
-    cardNumber: v.getUint32(0, true),
-    cardFamily: v.getUint8(4),
-    punches,
-    bytes: bytes.slice(),
-  };
+  const readout: ReaderBtReadout = { cardNumber, cardFamily, punches, bytes: bytes.slice() };
+  if (!complete) return readout;
+  let owner = end;
+  if (cardFamily === 15 && isSiacNumber(cardNumber) && payload.length >= end + SIAC_DATA_SIZE) {
+    readout.battery = decodeBattery(v, end);
+    owner = end + SIAC_DATA_SIZE;
+  }
+  readout.bytes.fill(0, HEADER + owner);
+  return readout;
 };
 
 /** Seconds since midnight and day of week (0 Sunday), the form the serial
@@ -231,7 +284,11 @@ const clock = (timeMs: number) => ({
  * readout.
  */
 export const toRaceResult = (readout: ReaderBtReadout): IRaceResultData => {
-  const result: IRaceResultData = { cardNumber: readout.cardNumber, punches: [] };
+  const result: IRaceResultData = {
+    cardNumber: readout.cardNumber,
+    ...readout.battery,
+    punches: [],
+  };
   for (const p of readout.punches) {
     const { time, weekdayRaw, subsec256 } = clock(p.timeMs);
     switch (p.type) {

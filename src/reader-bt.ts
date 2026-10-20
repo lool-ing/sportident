@@ -11,6 +11,7 @@ export {
   decodeReadout,
   encodeMessage,
   FEEDBACK,
+  isSiacNumber,
   PUNCH_TYPE,
   READER_BT_MSG,
   READER_BT_UUID,
@@ -24,4 +25,5 @@ export type {
   ReaderBtPunch,
   ReaderBtReadout,
   ReassemblyResult,
+  SiacBattery,
 } from './readerBt/messages.ts';

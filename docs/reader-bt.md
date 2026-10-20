@@ -32,14 +32,19 @@ written from the page as read on 2026-10-20, without a reader to test against.
   milliseconds since Sunday 00:00. There are no raw card pages: the message
   bytes are what a consumer stores as evidence of the read, and
   `decodeReadout` decodes them again.
+- **Complete readout** (`0x1103`), asked for SIAC numbers (8 000 000 to
+  8 999 999) only: after the punches a SIAC sends 13 bytes with hardware and
+  software version, battery voltage in millivolts and battery date, the
+  values the serial read takes from block 3. Then comes the owner's personal
+  data (name, contact details), which the client never decodes and zeroes in
+  the stored message bytes.
 - **Feedback** (`0x1110`): in readout mode the reader neither flashes nor beeps
   by itself. The client writes OK feedback after each read, the counterpart
   of the serial ACK.
 
 ## Left out on purpose
 
-- The complete readout (`0x1103`): it adds the owner's personal data and
-  SIAC production data. The client never asks for it.
+- The complete readout for cards other than SIAC: it adds only owner data.
 - Autosend, settings, device info, sleep mode, the sessions (backup) service
   and the battery service.
 
@@ -54,3 +59,10 @@ written from the page as read on 2026-10-20, without a reader to test against.
 - Are the milliseconds derived from the card's 1/256 s? `toRaceResult`
   assumes so when it rounds them back to 1/256 s.
 - What time does a punch with no valid time on the card carry?
+- Does the reader have the SIAC measure its battery before it sends the
+  voltage, or is it the value stored at the last measurement? The serial read
+  can measure first (`measureSiacBattery`); the Reader BT protocol has no such
+  command.
+- Personal data crosses the air: the owner data of a SIAC is in every
+  complete readout over an unpaired BLE link, even though the client zeroes
+  it.

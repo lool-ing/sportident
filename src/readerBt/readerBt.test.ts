@@ -185,6 +185,53 @@ describe('Reader BT readout', () => {
     });
   });
 
+  test('complete SIAC readout: battery data decoded, owner data zeroed in the stored bytes', () => {
+    const owner = [...new TextEncoder().encode('\u0001Ann;Example;')];
+    const production = [43, 43, ...u16(120), ...u16(7), ...u16(2980), 24, 3, 15, 20, 11];
+    const m = encodeMessage(READER_BT_MSG.cardReadoutComplete, [
+      ...u32(8123456),
+      15,
+      ...u16(1),
+      0,
+      7,
+      ...u16(31),
+      ...u32(1000),
+      ...production,
+      ...owner,
+    ]);
+    const r = decodeReadout(m);
+    assert.deepEqual(r.battery, {
+      batteryMillivolts: 2980,
+      hardwareVersion: '4.3',
+      softwareVersion: '4.3',
+      batteryDate: '2024-03-15',
+    });
+    const ownerAt = m.length - owner.length;
+    assert.deepEqual([...r.bytes.subarray(0, ownerAt)], [...m.subarray(0, ownerAt)]);
+    assert.ok(r.bytes.subarray(ownerAt).every((b) => b === 0));
+    assert.deepEqual(decodeReadout(r.bytes), r);
+    const rr = toRaceResult(r);
+    assert.deepEqual(
+      [rr.batteryMillivolts, rr.hardwareVersion, rr.softwareVersion, rr.batteryDate],
+      [2980, '4.3', '4.3', '2024-03-15']
+    );
+  });
+
+  test('complete readout of another card: no battery data, everything after the punches zeroed', () => {
+    const m = encodeMessage(READER_BT_MSG.cardReadoutComplete, [
+      ...u32(1234567),
+      1,
+      ...u16(0),
+      1,
+      65,
+      66,
+      0,
+    ]);
+    const r = decodeReadout(m);
+    assert.equal(r.battery, undefined);
+    assert.deepEqual([...r.bytes.subarray(11)], [0, 0, 0, 0]);
+  });
+
   test('a time past Saturday has no day of week', () => {
     const rr = toRaceResult(decodeReadout(readout(1234567, [[7, 31, 7 * 86_400_000]])));
     assert.equal(dayOfWeekFromRaw(rr.punches![0]!.weekdayRaw!), null);
@@ -217,6 +264,8 @@ class FakeLink implements GattLink {
 }
 
 const REQUEST = [...encodeMessage(READER_BT_MSG.cardReadoutMinimal)];
+/** A SIAC gets the complete readout, for its battery data. */
+const REQUEST_SIAC = [...encodeMessage(READER_BT_MSG.cardReadoutComplete)];
 const FEEDBACK_OK = [...encodeMessage(READER_BT_MSG.feedback, [1])];
 
 const setup = async () => {
@@ -241,7 +290,9 @@ describe('ReaderBt client', () => {
     const { link, events, state, data, flush } = await setup();
     state(8123456, true);
     await flush();
-    assert.deepEqual(link.writes, [{ characteristic: READER_BT_UUID.cardData, bytes: REQUEST }]);
+    assert.deepEqual(link.writes, [
+      { characteristic: READER_BT_UUID.cardData, bytes: REQUEST_SIAC },
+    ]);
     for (const n of notifications()) data(n);
     await flush();
     assert.deepEqual(events, [
@@ -266,7 +317,7 @@ describe('ReaderBt client', () => {
     ]);
     assert.deepEqual(
       link.writes.map((w) => w.bytes),
-      [REQUEST]
+      [REQUEST_SIAC]
     );
   });
 
