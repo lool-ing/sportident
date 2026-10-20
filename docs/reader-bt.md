@@ -40,7 +40,9 @@ written from the page as read on 2026-10-20, without a reader to test against.
   the stored message bytes.
 - **Feedback** (`0x1110`): in readout mode the reader neither flashes nor beeps
   by itself. The client writes OK feedback after each read, the counterpart
-  of the serial ACK.
+  of the serial ACK. With `confirmReads` it waits for the app to confirm, so
+  an app can store the read first. The page sets no time limit for the
+  feedback.
 
 ## Left out on purpose
 
@@ -63,6 +65,8 @@ written from the page as read on 2026-10-20, without a reader to test against.
   voltage, or is it the value stored at the last measurement? The serial read
   can measure first (`measureSiacBattery`); the Reader BT protocol has no such
   command.
+- Does the reader do anything when no feedback comes after a readout (a
+  time-out, a beep, a repeated card state)? The client assumes not.
 - Personal data crosses the air: the owner data of a SIAC is in every
   complete readout over an unpaired BLE link, even though the client zeroes
   it.

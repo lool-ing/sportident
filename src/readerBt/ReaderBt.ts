@@ -27,9 +27,12 @@ export interface GattLink {
   onDisconnect(listener: () => void): void;
 }
 
+/** Plays the feedback for a read, once; later calls do nothing. */
+export type ConfirmRead = (type?: keyof typeof FEEDBACK) => Promise<void>;
+
 export interface ReaderBtEvents {
   cardInserted: (cardNumber: number) => void;
-  cardRead: (readout: ReaderBtReadout) => void;
+  cardRead: (readout: ReaderBtReadout, confirm: ConfirmRead) => void;
   cardRemoved: (cardNumber: number) => void;
   error: (err: Error) => void;
 }
@@ -42,9 +45,15 @@ type Listeners = { [E in keyof ReaderBtEvents]: Set<ReaderBtEvents[E]> };
  * cardRead and play the OK feedback (in readout mode the reader plays none
  * itself). A card out before the reply drops the read: a later reply for that
  * card is ignored and gets no feedback. One read per insertion.
+ *
+ * With `confirmReads`, the feedback waits until the cardRead listener calls
+ * `confirm`, so an app that stores the read first beeps only once it is saved.
+ * The reader sets no time limit; without a confirm it stays silent, and the
+ * card is read again when it goes back in.
  */
 export class ReaderBt {
   private readonly link: GattLink;
+  private readonly confirmReads: boolean;
   private readonly listeners: Listeners = {
     cardInserted: new Set(),
     cardRead: new Set(),
@@ -57,8 +66,9 @@ export class ReaderBt {
   /** Card read during its current insertion. */
   private read: number | undefined;
 
-  constructor(link: GattLink) {
+  constructor(link: GattLink, opts: { confirmReads?: boolean } = {}) {
     this.link = link;
+    this.confirmReads = opts.confirmReads ?? false;
   }
 
   async start(): Promise<void> {
@@ -149,7 +159,13 @@ export class ReaderBt {
     if (readout.cardNumber !== this.reading) return;
     this.reading = undefined;
     this.read = readout.cardNumber;
-    this.emit('cardRead', readout);
-    this.feedback('ok').catch((err: Error) => this.emit('error', err));
+    let confirmed = false;
+    const confirm: ConfirmRead = (type = 'ok') => {
+      if (confirmed) return Promise.resolve();
+      confirmed = true;
+      return this.feedback(type);
+    };
+    this.emit('cardRead', readout, confirm);
+    if (!this.confirmReads) confirm().catch((err: Error) => this.emit('error', err));
   }
 }

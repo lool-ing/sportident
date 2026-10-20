@@ -134,6 +134,13 @@ battery date (`readout.battery`); the owner data in it is zeroed in
 `readout.bytes` and never decoded, but it still crosses the air: the
 Reader BT is not paired, so the link is not encrypted.
 
+To beep only once a read is saved, construct it with
+`{ confirmReads: true }`: `cardRead` then gets a `confirm` function as its
+second argument, and the feedback waits for `confirm()` (or
+`confirm('error')`). The reader sets no time limit. If `confirm` never
+comes, it stays silent; the read is not lost from the card, and it is read
+again when the card goes back in.
+
 ## Command line
 
 - `lool-readout` prints every card read as NDJSON on stdout.

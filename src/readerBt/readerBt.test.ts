@@ -17,7 +17,7 @@ import {
   toRaceResult,
   type ReaderBtReadout,
 } from './messages.ts';
-import { ReaderBt, type GattLink } from './ReaderBt.ts';
+import { ReaderBt, type ConfirmRead, type GattLink } from './ReaderBt.ts';
 import { toHalfDayClock } from '../output/ndjson.ts';
 import { dayOfWeekFromRaw } from '../siProtocol.ts';
 
@@ -268,13 +268,17 @@ const REQUEST = [...encodeMessage(READER_BT_MSG.cardReadoutMinimal)];
 const REQUEST_SIAC = [...encodeMessage(READER_BT_MSG.cardReadoutComplete)];
 const FEEDBACK_OK = [...encodeMessage(READER_BT_MSG.feedback, [1])];
 
-const setup = async () => {
+const setup = async (opts: { confirmReads?: boolean } = {}) => {
   const link = new FakeLink();
-  const reader = new ReaderBt(link);
+  const reader = new ReaderBt(link, opts);
   const events: [string, unknown][] = [];
+  const confirms: ConfirmRead[] = [];
   reader
     .on('cardInserted', (n) => events.push(['inserted', n]))
-    .on('cardRead', (r) => events.push(['read', r.cardNumber]))
+    .on('cardRead', (r, confirm) => {
+      events.push(['read', r.cardNumber]);
+      confirms.push(confirm);
+    })
     .on('cardRemoved', (n) => events.push(['removed', n]))
     .on('error', (e) => events.push(['error', e.message]));
   await reader.start();
@@ -282,7 +286,7 @@ const setup = async () => {
     link.notify(READER_BT_UUID.cardState, cardState(card, inserted));
   const data = (bytes: Uint8Array) => link.notify(READER_BT_UUID.cardData, bytes);
   const flush = () => new Promise((r) => setImmediate(r));
-  return { link, events, state, data, flush };
+  return { link, events, confirms, state, data, flush };
 };
 
 describe('ReaderBt client', () => {
@@ -376,6 +380,43 @@ describe('ReaderBt client', () => {
       ['error', 'Reader BT: segment flag 0 without a first segment'],
       ['error', 'Reader BT: segment flag 2 without a first segment'],
     ]);
+  });
+
+  test('confirmReads: no feedback until the app confirms, then once', async () => {
+    const { link, confirms, state, data, flush } = await setup({ confirmReads: true });
+    state(1111111, true);
+    data(readout(1111111));
+    await flush();
+    assert.deepEqual(
+      link.writes.map((w) => w.bytes),
+      [REQUEST]
+    );
+    await confirms[0]!();
+    await confirms[0]!();
+    assert.deepEqual(
+      link.writes.map((w) => w.bytes),
+      [REQUEST, FEEDBACK_OK]
+    );
+  });
+
+  test('confirmReads: the app can answer error feedback when it could not store the read', async () => {
+    const { link, confirms, state, data } = await setup({ confirmReads: true });
+    state(1111111, true);
+    data(readout(1111111));
+    await confirms[0]!('error');
+    assert.deepEqual(link.writes.at(-1)!.bytes, [...encodeMessage(READER_BT_MSG.feedback, [2])]);
+  });
+
+  test('without confirmReads, confirm after the automatic feedback sends nothing more', async () => {
+    const { link, confirms, state, data, flush } = await setup();
+    state(1111111, true);
+    data(readout(1111111));
+    await flush();
+    await confirms[0]!();
+    assert.deepEqual(
+      link.writes.map((w) => w.bytes),
+      [REQUEST, FEEDBACK_OK]
+    );
   });
 
   test('a failed request write is reported and the card can be read on its next insertion', async () => {

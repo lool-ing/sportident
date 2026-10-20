@@ -5,7 +5,7 @@
 // load it, and free of Node APIs so it runs in a browser.
 
 export { ReaderBt } from './readerBt/ReaderBt.ts';
-export type { GattLink, ReaderBtEvents } from './readerBt/ReaderBt.ts';
+export type { ConfirmRead, GattLink, ReaderBtEvents } from './readerBt/ReaderBt.ts';
 export {
   decodeCardState,
   decodeReadout,
