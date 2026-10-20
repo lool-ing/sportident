@@ -50,6 +50,11 @@ describe('parseArgs hardening', () => {
     assert.strictEqual(parseArgs(['--pretty']).pretty, true);
   });
 
+  test('--measure-siac-battery is off by default and toggles on', () => {
+    assert.strictEqual(parseArgs([]).measureSiacBattery, false);
+    assert.strictEqual(parseArgs(['--measure-siac-battery']).measureSiacBattery, true);
+  });
+
   test('regression: --device followed by another flag throws (does not absorb --once)', () => {
     assert.throws(() => parseArgs(['--device', '--once']), /--device requires a value/);
   });

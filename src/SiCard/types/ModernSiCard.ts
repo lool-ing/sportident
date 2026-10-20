@@ -242,6 +242,9 @@ export const modernSiCardStorageLocations: SiStorageLocations<IModernSiCardStora
 };
 export const modernSiCardStorageDefinition = defineStorage(0x400, modernSiCardStorageLocations);
 
+const BATTERY_MEASURE_TIMEOUT_MS = 1_000;
+const BATTERY_MEASURE_PAUSE_MS = 100;
+
 export abstract class ModernSiCard extends BaseSiCard {
   static maxNumPunches = MAX_NUM_PUNCHES;
   /** Read block 3 (battery, versions); SPORTident's library reads it on
@@ -252,6 +255,9 @@ export abstract class ModernSiCard extends BaseSiCard {
   public cardSeries?: ModernSiCardSeriesKey;
   public uid?: number;
   protected block1Read = false;
+  /** Measure the battery before block 3 is read (SiMainStation's
+   * measureSiacBattery). Only cards that read block 3 (SIAC) measure. */
+  measureBattery = false;
 
   constructor(cardNumber: number) {
     super(cardNumber);
@@ -304,9 +310,30 @@ export abstract class ModernSiCard extends BaseSiCard {
 
   typeSpecificReadBlock3(): Promise<void> {
     if (!(this.constructor as typeof ModernSiCard).readsBlock3) return Promise.resolve();
-    return this.typeSpecificGetPage(3).then((page3) => {
-      this.storage.splice(bytesPerPage * 3, bytesPerPage, ...page3);
-    });
+    return this.measureBatteryFirst()
+      .then(() => this.typeSpecificGetPage(3))
+      .then((page3) => {
+        this.storage.splice(bytesPerPage * 3, bytesPerPage, ...page3);
+      });
+  }
+
+  /** The battery voltage in block 3 is only current after a measurement: write
+   * 05 05 05 05 to page 0x7E, then wait 100 ms before reading block 3 (SPORTident
+   * Config+ changelog 0.8.14; the same command in MeOS SportIdent.cpp:1430-1443).
+   * Reply timeout 1000 ms (Config+ 0.9.0). A NAK or no reply keeps the stored
+   * value and the read goes on: a weak battery may not answer (Config+ CONFIG-404). */
+  private measureBatteryFirst(): Promise<void> {
+    if (!this.measureBattery || !this.mainStation) return Promise.resolve();
+    return this.mainStation
+      .sendMessage(
+        { command: proto.cmd.SET_SI8, parameters: [0x7e, 0x05, 0x05, 0x05, 0x05] },
+        1,
+        BATTERY_MEASURE_TIMEOUT_MS
+      )
+      .then(
+        () => new Promise<void>((resolve) => setTimeout(resolve, BATTERY_MEASURE_PAUSE_MS)),
+        () => undefined
+      );
   }
 
   typeSpecificReadCardHolder(): Promise<void> {
