@@ -1,0 +1,9 @@
+# Reader BT minimal readout (0x1102) of a made-up SIAC 8123456, split into
+# four 0xA101 segment notifications (one per line). Tuesday: clear 10:00:00,
+# check 10:00:05 (code 10), start 10:15:30.500 (code 1), controls 31 10:20:00,
+# 32 13:05:07, 33 13:30:00, finish 13:45:10.250 (code 2), finish reserve
+# 13:45:09 (code 2). Built from the published message layout, not recorded.
+01 A1 19 00 01 4B 00 00 00 02 11 47 00 40 F4 7B 00 0F 08 00 00 01 00 00 00 09 72 0C 00
+01 A1 15 00 00 02 0A 00 88 1C 72 0C 00 03 01 00 C4 3B 80 0C 00 07 1F 00 80
+01 A1 15 00 00 58 84 0C 00 07 20 00 B8 83 1B 0D 00 07 21 00 C0 4B 32 0D 00
+01 A1 10 00 02 05 02 00 6A 2F 40 0D 00 06 02 00 88 2A 40 0D

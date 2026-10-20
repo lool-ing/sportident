@@ -4,7 +4,7 @@ import pkg from './package.json' with { type: 'json' };
 
 export default defineConfig({
   define: { __LOOL_VERSION__: JSON.stringify(pkg.version) },
-  entry: ['src/index.ts', 'src/bin/lool-readout.ts', 'src/bin/lool-trainer.ts'],
+  entry: ['src/index.ts', 'src/reader-bt.ts', 'src/bin/lool-readout.ts', 'src/bin/lool-trainer.ts'],
   format: ['esm', 'cjs'],
   // TypeScript 6 deprecates baseUrl, and tsup 8.5.1 (the last release)
   // always injects baseUrl into its dts build. Scoped to tsup only;

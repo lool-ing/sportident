@@ -113,6 +113,34 @@ in block 1, which a card without punches never reads), so consumers blank
 only the bytes of blocks they have. The ranges are tested not to overlap any decoded race field (times, codes, punches,
 subseconds, SIAC reserve records and block-1 codes).
 
+## Reader BT (Bluetooth)
+
+`@lool-ing/sportident/reader-bt` reads cards from a SPORTident Reader BT
+over Bluetooth Low Energy. It has no Node APIs, so it runs in a browser.
+The Reader BT reads SIAC, SI-Card 8–11, SI-pCard and ComCard; SI-Card 5 and
+6 need a USB reader. Not yet tested on a real reader; see
+[docs/reader-bt.md](docs/reader-bt.md) for what it relies on and the open
+questions.
+
+`ReaderBt` takes a `GattLink`: an adapter that has connected, found the
+characteristics by UUID (`READER_BT_UUID`) and can write and subscribe.
+On a card in it asks for the minimal readout, emits `cardRead` once per
+insertion and plays the reader's OK feedback. A card out before the reply
+drops the read. The readout carries decoded punches, not raw pages; store
+`readout.bytes` and decode them again with `decodeReadout`. `toRaceResult`
+gives the same fields as a serial card's `raceResult`. For a SIAC the client
+asks for the complete readout to get its battery voltage, versions and
+battery date (`readout.battery`); the owner data in it is zeroed in
+`readout.bytes` and never decoded, but it still crosses the air: the
+Reader BT is not paired, so the link is not encrypted.
+
+To beep only once a read is saved, construct it with
+`{ confirmReads: true }`: `cardRead` then gets a `confirm` function as its
+second argument, and the feedback waits for `confirm()` (or
+`confirm('error')`). The reader sets no time limit. If `confirm` never
+comes, it stays silent; the read is not lost from the card, and it is read
+again when the card goes back in.
+
 ## Command line
 
 - `lool-readout` prints every card read as NDJSON on stdout.
