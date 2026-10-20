@@ -47,6 +47,16 @@ again without a removal; that only gets an ACK until the card is taken
 away. After a process restart or reconnect (`readCards()`) the card may be
 read again. A failed read is retried on the next insertion report.
 
+The ACK is what makes the station beep, and a runner may take the card
+away at the beep. To beep only once a read is saved, construct the station
+with `new SiMainStation(transport, { confirmReads: true })`: `cardRead`
+then comes before the ACK, with a `confirm` function as its second
+argument, and the ACK waits for `confirm()`. SPORTident's programmer's
+guide sets no time limit for the ACK. If `confirm` never comes, the station
+does not beep and the data stays on the card, which is read again when it
+goes back in. A card taken out before `confirm` gets no ACK. Not yet
+checked on a real station.
+
 Other entry points, all exported from the package root:
 
 - `AutosendListener` emits a `punch` for each autosend record on a
