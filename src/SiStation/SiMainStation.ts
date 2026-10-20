@@ -13,6 +13,8 @@
 //     'cardInserted', awaits card.read() (which calls back into sendMessage for
 //     GET_SI5 / GET_SI8 — WAKEUP prepended by the multiplexer automatically),
 //     emits 'cardRead'. SI_REM emits 'cardRemoved'.
+//   - Opt-in confirmReads: the ACK (the station's beep) waits for the
+//     cardRead listener to call confirm, so an app can store the read first.
 //   - Frame errors propagate through the multiplexer's 'frameError' event with
 //     the typed FrameError payload unchanged.
 //   - Dropped: TRANS_REC autosend listener (Phase 4), CoupledSiStation, the
@@ -81,8 +83,11 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
   /** Ends the wait before a NAK retry at once (the card left). */
   private cancelNakWait: (() => void) | undefined;
 
-  constructor(transport: ISerialTransport) {
+  private readonly confirmReads: boolean;
+
+  constructor(transport: ISerialTransport, opts: { confirmReads?: boolean } = {}) {
     super();
+    this.confirmReads = opts.confirmReads ?? false;
     this.multiplexer = new SiTargetMultiplexer(transport);
     this.station = new BaseSiStation({
       sendMessage: (msg, expected, timeout) => this.multiplexer.sendMessage(msg, expected, timeout),
@@ -255,22 +260,30 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
       // a timeout on it. We emit cardRead AFTER the ACK send promise
       // resolves so subscribers see the events in causal order
       // (cardInserted -> [card data on wire] -> [ACK on wire] -> cardRead).
+      // With confirmReads, cardRead comes first and the ACK waits for confirm.
+      const ack = async (): Promise<void> => {
+        // All pages came before the card left: report it, but no ACK, since
+        // the station may already hold the next card.
+        if (this.readingCard !== card) return;
+        // Still reading until the ACK is out: a failed write leaves no lock,
+        // so the next detect reads the card again.
+        // Checked again when the ACK's turn comes: it may wait behind a
+        // draining write while the card leaves and the next one comes in.
+        const sent = await this.multiplexer.sendBareAck(() => this.readingCard === card);
+        if (!sent || this.readingCard !== card) return;
+        this.readingCard = undefined;
+        this.ackedCardNumber = card.cardNumber;
+      };
+      let confirmed: Promise<void> | undefined;
+      const confirm = (): Promise<void> =>
+        (confirmed ??= ack().catch((err: Error) => {
+          if (this.readingCard === card) this.readingCard = undefined;
+          throw err;
+        }));
       card
         .read()
-        .then(async () => {
-          // All pages came before the card left: report it, but no ACK, since
-          // the station may already hold the next card.
-          if (this.readingCard !== card) return;
-          // Still reading until the ACK is out: a failed write leaves no lock,
-          // so the next detect reads the card again.
-          // Checked again when the ACK's turn comes: it may wait behind a
-          // draining write while the card leaves and the next one comes in.
-          const sent = await this.multiplexer.sendBareAck(() => this.readingCard === card);
-          if (!sent || this.readingCard !== card) return;
-          this.readingCard = undefined;
-          this.ackedCardNumber = card.cardNumber;
-        })
-        .then(() => this.emit('cardRead', card))
+        .then(() => (this.confirmReads ? undefined : confirm()))
+        .then(() => this.emit('cardRead', card, confirm))
         .catch((err: Error) => {
           if (this.readingCard === card) this.readingCard = undefined;
           // Forward as a frameError so subscribers see the failure.

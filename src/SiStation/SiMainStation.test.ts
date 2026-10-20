@@ -828,3 +828,70 @@ void BaseSiCard;
 void CRC16;
 // Reference si10ManyFixture so the import line is intentional for future multi-page tests.
 void si10ManyFixture;
+
+describe('SiMainStation: confirmReads', () => {
+  const card = si5Fixture.cardData.cardNumber as number;
+  const isAck = (c: number[]) => c.length === 1 && c[0] === proto.ACK;
+  const isGet = (c: number[]) => c[0] === proto.WAKEUP && c[2] === proto.cmd.GET_SI5;
+  const removed = (n: number) => {
+    const p = buildSi5DetFrame(n);
+    return renderFrame(proto.cmd.SI_REM, p.slice(3, 9));
+  };
+  const wait = (ms = 50) => new Promise((r) => setTimeout(r, ms));
+
+  const setUp = async (opts: { confirmReads?: boolean }) => {
+    const fake = new FakeSerialTransport();
+    setUpHandshakeRules(fake);
+    const station = new SiMainStation(fake, opts);
+    await fake.open();
+    await station.readCards();
+    fake.addRule(isGet, () => renderGetSi5Response(si5Fixture.storageData as number[]));
+    const confirms: (() => Promise<void>)[] = [];
+    station.on('cardRead', (_c: BaseSiCard, confirm: () => Promise<void>) =>
+      confirms.push(confirm)
+    );
+    const from = fake.recordedSends.length;
+    const sends = () => fake.recordedSends.slice(from);
+    return { fake, station, confirms, sends };
+  };
+
+  test('no ACK until confirm; one ACK however often it is called; then a re-detect is only ACKed', async () => {
+    const { fake, station, confirms, sends } = await setUp({ confirmReads: true });
+    fake.inject(buildSi5DetFrame(card));
+    await wait();
+    assert.strictEqual(confirms.length, 1);
+    assert.ok(!sends().some(isAck), 'no ACK before confirm');
+    await Promise.all([confirms[0]!(), confirms[0]!()]);
+    assert.strictEqual(sends().filter(isAck).length, 1);
+    fake.inject(buildSi5DetFrame(card));
+    await wait();
+    assert.strictEqual(sends().filter(isGet).length, 1, 'not read again');
+    assert.strictEqual(sends().filter(isAck).length, 2);
+    await station.close();
+  });
+
+  test('card out before confirm: no ACK, and the card is read again when it goes back in', async () => {
+    const { fake, station, confirms, sends } = await setUp({ confirmReads: true });
+    fake.inject(buildSi5DetFrame(card));
+    await wait();
+    fake.inject(removed(card));
+    await wait();
+    await confirms[0]!();
+    assert.ok(!sends().some(isAck));
+    fake.inject(buildSi5DetFrame(card));
+    await wait();
+    assert.strictEqual(confirms.length, 2);
+    assert.strictEqual(sends().filter(isGet).length, 2);
+    await station.close();
+  });
+
+  test('without confirmReads the ACK is already sent; confirm adds nothing', async () => {
+    const { fake, station, confirms, sends } = await setUp({});
+    fake.inject(buildSi5DetFrame(card));
+    await wait();
+    assert.strictEqual(sends().filter(isAck).length, 1);
+    await confirms[0]!();
+    assert.strictEqual(sends().filter(isAck).length, 1);
+    await station.close();
+  });
+});

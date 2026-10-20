@@ -2,7 +2,7 @@
 // Upstream: https://github.com/allestuetsmerweh/sportident.js (MIT License)
 // Local modifications: trimmed to the Phase 0 surface — readCards() + close()
 // + the SiMainStation event surface (cardInserted/cardRead/cardRemoved/
-// frameError/connectionChanged). Dropped CoupledSiStation / autosend hooks.
+// frameError/connectionChanged), cardRead with a confirm. Dropped CoupledSiStation / autosend hooks.
 // See NOTICE.md for cumulative attribution.
 
 import type { BaseSiCard } from '../SiCard/BaseSiCard.ts';
@@ -21,7 +21,9 @@ export interface UnsupportedCard {
 
 export interface SiMainStationEvents {
   cardInserted: (card: BaseSiCard) => void;
-  cardRead: (card: BaseSiCard) => void;
+  /** `confirm` sends the ACK (the station's beep), once; with confirmReads
+   * the read waits for it, otherwise it is already sent. */
+  cardRead: (card: BaseSiCard, confirm: () => Promise<void>) => void;
   cardRemoved: (cardNumber: number) => void;
   cardUnsupported: (card: UnsupportedCard) => void;
   frameError: (err: FrameError) => void;
