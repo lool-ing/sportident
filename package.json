@@ -34,6 +34,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.cjs"
+    },
+    "./reader-bt": {
+      "types": "./dist/reader-bt.d.ts",
+      "import": "./dist/reader-bt.mjs",
+      "require": "./dist/reader-bt.cjs"
     }
   },
   "bin": {
