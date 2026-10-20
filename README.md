@@ -131,7 +131,8 @@ drops the read. The readout carries decoded punches, not raw pages; store
 gives the same fields as a serial card's `raceResult`. For a SIAC the client
 asks for the complete readout to get its battery voltage, versions and
 battery date (`readout.battery`); the owner data in it is zeroed in
-`readout.bytes` and never decoded.
+`readout.bytes` and never decoded, but it still crosses the air: the
+Reader BT is not paired, so the link is not encrypted.
 
 ## Command line
 
