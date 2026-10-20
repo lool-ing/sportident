@@ -58,6 +58,7 @@ export interface CliOpts {
   once: boolean;
   includeRawPages: boolean;
   pretty: boolean;
+  measureSiacBattery: boolean;
   record?: string;
   replay?: string;
 }
@@ -75,6 +76,8 @@ Options:
   --include-raw-pages      Include raw_pages (base64 per block) in card_read events
   --pretty                 Print a human-readable punch table instead of NDJSON
                            (ignored with --record and --replay)
+  --measure-siac-battery   Have each SIAC measure its battery before its voltage
+                           is read (writes to the card; not hardware-tested)
   --record <basename>      Tee NDJSON to <basename>.expected.json AND capture
                            a directional wire transcript ('out <hex>' / 'in <hex>'
                            lines) to <basename>.bytes.hex. Allowed roots: the
@@ -101,6 +104,7 @@ export const parseArgs = (argv: string[]): CliOpts => {
     once: false,
     includeRawPages: false,
     pretty: false,
+    measureSiacBattery: false,
   };
   // Helper: pull the value for a `--flag` argument. Accepts either the
   // following positional token (`--flag value`) OR an inline `--flag=value`
@@ -139,6 +143,8 @@ export const parseArgs = (argv: string[]): CliOpts => {
       opts.includeRawPages = true;
     } else if (a === '--pretty') {
       opts.pretty = true;
+    } else if (a === '--measure-siac-battery') {
+      opts.measureSiacBattery = true;
     } else if (a === '--record' || a.startsWith('--record=')) {
       const { value, consumed } = valueFor('--record', a, i);
       opts.record = value;
@@ -315,7 +321,9 @@ const main = async (): Promise<void> => {
     });
   }
 
-  const station = new SiMainStation(activeTransport);
+  const station = new SiMainStation(activeTransport, {
+    measureSiacBattery: opts.measureSiacBattery,
+  });
 
   // Centralised shutdown: closes station then sinks (flushing RecordSink) then exits.
   const shutdown = async (code: number): Promise<void> => {

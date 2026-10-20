@@ -24,6 +24,7 @@ import { proto } from '../constants.ts';
 import type { FrameError, SiMessage } from '../siProtocol.ts';
 import { arr2cardNumber } from '../siProtocol.ts';
 import { BaseSiCard } from '../SiCard/BaseSiCard.ts';
+import { ModernSiCard } from '../SiCard/types/ModernSiCard.ts';
 import { EventEmitter } from '../utils/events.ts';
 import type { ISerialTransport } from '../transport/ISerialTransport.ts';
 import {
@@ -81,8 +82,13 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
   /** Ends the wait before a NAK retry at once (the card left). */
   private cancelNakWait: (() => void) | undefined;
 
-  constructor(transport: ISerialTransport) {
+  /** Measure a SIAC's battery before reading its voltage. Off by default, as in
+   * SPORTident Config+ (CONFIG-290) and MeOS: it writes to the card. */
+  private readonly measureSiacBattery: boolean;
+
+  constructor(transport: ISerialTransport, opts: { measureSiacBattery?: boolean } = {}) {
     super();
+    this.measureSiacBattery = opts.measureSiacBattery ?? false;
     this.multiplexer = new SiTargetMultiplexer(transport);
     this.station = new BaseSiStation({
       sendMessage: (msg, expected, timeout) => this.multiplexer.sendMessage(msg, expected, timeout),
@@ -243,6 +249,7 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
       card.mainStation = {
         sendMessage: (msg, expected, timeout) => this._sendForCard(card, msg, expected, timeout),
       };
+      if (this.measureSiacBattery && card instanceof ModernSiCard) card.measureBattery = true;
       this.emit('cardInserted', card);
       this.readingCard = card;
       // Drive the typeSpecificRead chain; emit cardRead on success.
@@ -328,10 +335,12 @@ export class SiMainStation extends EventEmitter implements ISiMainStation {
       }
       return frames;
     } catch (err) {
+      // A write to the card (the battery measurement) is not repeated.
       const again =
-        err instanceof NakError ||
-        err instanceof SendTimeoutError ||
-        err instanceof StaleReplyError;
+        !(message.mode === undefined && message.command === proto.cmd.SET_SI8) &&
+        (err instanceof NakError ||
+          err instanceof SendTimeoutError ||
+          err instanceof StaleReplyError);
       if (!again || attempt + 1 >= CARD_TRY_TIMEOUTS_MS.length || this.readingCard !== card) {
         throw err;
       }

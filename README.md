@@ -47,6 +47,13 @@ again without a removal; that only gets an ACK until the card is taken
 away. After a process restart or reconnect (`readCards()`) the card may be
 read again. A failed read is retried on the next insertion report.
 
+A SIAC reports the battery voltage stored at its last measurement.
+`new SiMainStation(transport, { measureSiacBattery: true })` (or
+`lool-readout --measure-siac-battery`) has each SIAC measure first, as
+SPORTident Config+ can: it writes to the card, waits 100 ms and then reads
+the voltage. If the card does not answer the measurement, the stored value
+is reported. Off by default and not yet tested on hardware.
+
 Other entry points, all exported from the package root:
 
 - `AutosendListener` emits a `punch` for each autosend record on a
